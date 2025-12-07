@@ -1,0 +1,8 @@
+{
+  "name": "Postpartum Recovery AI",
+  "description": "A privacy-first, AI-powered assistant for postpartum recovery, offering personalized roadmaps, diastasis recti analysis, and exercise form correction.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
