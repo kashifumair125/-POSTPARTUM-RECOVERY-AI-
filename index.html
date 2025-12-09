@@ -3,8 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#e11d48" />
+    <link rel="manifest" href="/manifest.json" />
     <title>Postpartum Recovery AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+      }
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
       body {
@@ -15,14 +22,20 @@
         width: 8px;
       }
       ::-webkit-scrollbar-track {
-        background: #f1f1f1; 
+        background: #f5f5f4; /* stone-100 */
       }
       ::-webkit-scrollbar-thumb {
-        background: #cbd5e1; 
+        background: #d6d3d1; /* stone-300 */
         border-radius: 4px;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: #94a3b8; 
+        background: #a8a29e; /* stone-400 */
+      }
+      .dark ::-webkit-scrollbar-track {
+        background: #1c1917; /* stone-900 */
+      }
+      .dark ::-webkit-scrollbar-thumb {
+        background: #44403c; /* stone-700 */
       }
     </style>
   <script type="importmap">
@@ -32,12 +45,26 @@
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.31.0",
     "react/": "https://aistudiocdn.com/react@^19.2.1/",
-    "react": "https://aistudiocdn.com/react@^19.2.1"
+    "react": "https://aistudiocdn.com/react@^19.2.1",
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+    "three/": "https://aistudiocdn.com/three@^0.181.2/"
   }
 }
 </script>
 </head>
-  <body class="bg-slate-50 text-slate-800">
+  <body class="bg-stone-50 dark:bg-stone-950 text-stone-800 dark:text-stone-100 transition-colors duration-300">
     <div id="root"></div>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').then(registration => {
+            console.log('SW registered: ', registration);
+          }).catch(registrationError => {
+            console.log('SW registration failed: ', registrationError);
+          });
+        });
+      }
+    </script>
   </body>
 </html>

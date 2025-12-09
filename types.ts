@@ -38,10 +38,11 @@ export interface Exercise {
   reps: string;
   frequency: string; // "2x per day"
   description: string; // Short summary
+  benefits: string; // IMPACT: How it affects them
   howTo: string[]; // Step by step instructions
   whenToAvoid: string; // "Stop if you feel..."
   safetyNote?: string;
-  visualTag: 'lying_back' | 'all_fours' | 'standing' | 'seated' | 'plank'; // For animation mapping
+  visualTag: 'lying_back' | 'all_fours' | 'standing' | 'seated' | 'plank' | 'glute_bridge' | 'bird_dog' | 'side_plank' | 'lunge'; 
 }
 
 export interface RecoveryPhase {
@@ -70,4 +71,23 @@ export interface VideoAnalysis {
   feedback: string;
   corrections: string[];
   safetyScore: number; // 1-10
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'ai';
+  text: string;
+  timestamp: number;
+}
+
+export interface AppState {
+  profile: UserProfile | null;
+  plan: RecoveryPlan | null;
+  logs: Record<string, string[]>; // Key: Date (YYYY-MM-DD), Value: Array of Exercise Names completed
+  settings: {
+    remindersEnabled: boolean;
+    theme: 'light' | 'dark';
+  };
+  hasAgreedToTerms: boolean;
+  chatHistory: ChatMessage[];
 }
