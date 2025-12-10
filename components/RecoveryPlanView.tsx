@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useMemo } from 'react';
 import { RecoveryPlan, RecoveryPhase, Exercise } from '../types';
 import { ChevronDown, ChevronUp, Calendar, Info, Globe, AlertOctagon, MessageSquare, X, Clock, Repeat, CheckCircle, Video, List, Volume2, Square, Settings, RefreshCcw, Sparkles, Trophy, Flame, Check } from 'lucide-react';
 import VideoLab from './VideoLab';
 import ExerciseAnimation from './ExerciseAnimation';
 import { analyzeExerciseFeedback } from '../services/geminiService';
 import { loadState, toggleExerciseCompletion, calculateStreak, getTodayDate } from '../services/storageService';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface Props {
   plan: RecoveryPlan;
@@ -14,6 +16,7 @@ interface Props {
 
 // --- SUB-COMPONENT: WEEKLY TRACKER ---
 const WeeklyTracker: React.FC<{ logs: Record<string, string[]> }> = ({ logs }) => {
+  const { t } = useLanguage();
   // Generate last 7 days based on Local Time
   const days = Array.from({ length: 7 }).map((_, i) => {
     const d = new Date();
@@ -50,7 +53,7 @@ const WeeklyTracker: React.FC<{ logs: Record<string, string[]> }> = ({ logs }) =
       ))}
       <div className="hidden sm:block h-8 w-px bg-white/10 mx-2"></div>
       <div className="hidden sm:flex flex-col justify-center">
-          <span className="text-[10px] text-white/60 uppercase font-bold tracking-wider">Consistency</span>
+          <span className="text-[10px] text-white/60 uppercase font-bold tracking-wider">{t('consistency')}</span>
           <span className="text-xs text-white font-medium">Keep it up!</span>
       </div>
     </div>
@@ -62,6 +65,7 @@ const ExerciseCard: React.FC<{
   isCompleted: boolean;
   onToggle: () => void;
 }> = ({ exercise, isCompleted, onToggle }) => {
+  const { t, language } = useLanguage();
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedbackText, setFeedbackText] = useState("");
   const [aiAdvice, setAiAdvice] = useState<string | null>(null);
@@ -75,24 +79,18 @@ const ExerciseCard: React.FC<{
   useEffect(() => {
     const loadVoices = () => {
       const allVoices = window.speechSynthesis.getVoices();
-      const ladyVoices = allVoices.filter(v => {
-        const lowerName = v.name.toLowerCase();
-        if (lowerName.includes('male') && !lowerName.includes('female')) return false;
-        return (
-          lowerName.includes('female') || 
-          lowerName.includes('woman') ||
-          v.name === 'Google US English'
-        );
-      });
-      const availableVoices = ladyVoices.length > 0 ? ladyVoices : allVoices;
-      setVoices(availableVoices);
-      const savedVoiceName = localStorage.getItem('postpartum_ai_voice');
-      let voiceToSet = availableVoices[0]; 
-      if (savedVoiceName) {
-        const saved = availableVoices.find(v => v.name === savedVoiceName);
-        if (saved) voiceToSet = saved;
+      // Try to find a voice matching the current language
+      const langPrefix = language === 'en' ? 'en' : language;
+      const matchingVoices = allVoices.filter(v => v.lang.startsWith(langPrefix));
+      
+      if (matchingVoices.length > 0) {
+        setVoices(matchingVoices);
+        setSelectedVoice(matchingVoices[0]);
+      } else {
+        // Fallback to all voices if no specific match
+        setVoices(allVoices);
+        setSelectedVoice(allVoices[0]);
       }
-      setSelectedVoice(voiceToSet);
     };
     loadVoices();
     window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
@@ -100,22 +98,13 @@ const ExerciseCard: React.FC<{
       window.speechSynthesis.removeEventListener('voiceschanged', loadVoices);
       window.speechSynthesis.cancel();
     };
-  }, []);
-
-  const handleVoiceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const voiceName = e.target.value;
-    const voice = voices.find(v => v.name === voiceName);
-    if (voice) {
-      setSelectedVoice(voice);
-      localStorage.setItem('postpartum_ai_voice', voiceName);
-    }
-  };
+  }, [language]);
 
   const handleGetFeedback = async () => {
     if (!feedbackText.trim()) return;
     setLoadingAdvice(true);
     try {
-      const advice = await analyzeExerciseFeedback(exercise.name, feedbackText);
+      const advice = await analyzeExerciseFeedback(exercise.name, feedbackText, language);
       setAiAdvice(advice);
     } catch (e) {
       setAiAdvice("Could not analyze feedback. Try again.");
@@ -126,7 +115,7 @@ const ExerciseCard: React.FC<{
 
   const speakInstructions = () => {
     if (!('speechSynthesis' in window)) return;
-    const script = `Exercise: ${exercise.name}. Benefits: ${exercise.benefits}. Target: ${exercise.reps}. Instructions: ${exercise.howTo.join('. ')}.`;
+    const script = `${exercise.name}. ${exercise.description}. ${exercise.howTo.join('. ')}.`;
     const utterance = new SpeechSynthesisUtterance(script);
     if (selectedVoice) utterance.voice = selectedVoice;
     utterance.rate = 0.95; 
@@ -184,11 +173,13 @@ const ExerciseCard: React.FC<{
 
           <p className="text-sm text-stone-600 dark:text-stone-300 mb-4 font-medium leading-relaxed">{exercise.description}</p>
           
-          <div className="mb-4 p-3 bg-rose-50/50 dark:bg-rose-900/10 rounded-lg border border-rose-100 dark:border-rose-900/30">
-             <div className="flex items-center gap-1.5 text-xs font-bold text-rose-600 dark:text-rose-400 mb-1 uppercase tracking-wide">
-               <Sparkles size={12} /> Benefits
-             </div>
-             <p className="text-xs md:text-sm text-stone-700 dark:text-stone-300 leading-relaxed italic">"{exercise.benefits}"</p>
+          <div className="mb-5 bg-gradient-to-br from-rose-50/50 to-transparent dark:from-rose-900/10 dark:to-transparent p-4 rounded-xl border border-rose-100 dark:border-rose-900/20">
+             <h4 className="text-xs font-bold text-rose-700 dark:text-rose-400 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                <Sparkles size={14} /> How it helps
+             </h4>
+             <p className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
+               {exercise.benefits}
+             </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3 mb-4">
@@ -228,7 +219,7 @@ const ExerciseCard: React.FC<{
              onClick={() => setShowFeedback(!showFeedback)}
              className={`w-full flex items-center justify-center gap-2 py-2.5 text-sm font-semibold rounded-lg transition-colors ${showFeedback ? 'bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-300' : 'bg-white border border-stone-200 text-stone-600 hover:bg-stone-50 dark:bg-stone-800 dark:border-stone-700 dark:text-stone-300'}`}
            >
-             <MessageSquare size={16} /> Coach Me
+             <MessageSquare size={16} /> {t('coach')}
            </button>
 
           {showFeedback && (
@@ -298,38 +289,63 @@ const PhaseCard: React.FC<{
   logs: string[];
   onToggleExercise: (name: string) => void;
 }> = ({ phase, isOpen, toggle, logs, onToggleExercise }) => {
+  const [isTipExpanded, setIsTipExpanded] = useState(false);
   const total = phase.exercises.length;
   const completed = phase.exercises.filter(ex => logs.includes(ex.name)).length;
-  const progress = Math.round((completed / total) * 100);
+  const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+  
+  // Dynamic color based on progress
+  const progressColor = progress === 100 
+    ? 'bg-green-500' 
+    : progress >= 50 
+      ? 'bg-rose-500' 
+      : 'bg-rose-400';
 
   return (
-    <div className={`border rounded-xl mb-6 overflow-hidden transition-all duration-300 ${isOpen ? 'border-rose-200 bg-rose-50/30 dark:bg-rose-900/10 shadow-md' : 'border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 hover:border-stone-300'}`}>
+    <div className={`border rounded-xl mb-6 overflow-hidden transition-all duration-300 ${isOpen ? 'border-rose-200 bg-rose-50/30 dark:bg-rose-900/10 shadow-md ring-1 ring-rose-100 dark:ring-rose-900/50' : 'border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 hover:border-stone-300'}`}>
       <button onClick={toggle} className="w-full flex items-center justify-between p-5 text-left focus:outline-none">
         <div className="flex-1 pr-4">
-          <div className="flex items-center gap-2 text-xs font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider mb-1">
+          <div className="flex items-center gap-2 text-xs font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider mb-2">
             <Calendar size={14} /> {phase.weekRange}
           </div>
-          <h3 className="text-lg font-bold text-stone-800 dark:text-stone-100">{phase.phaseName}</h3>
+          <h3 className="text-lg font-bold text-stone-800 dark:text-stone-100 mb-3">{phase.phaseName}</h3>
           
-          <div className="flex items-center gap-3 mt-2">
-            <div className="h-1.5 w-24 bg-stone-200 dark:bg-stone-700 rounded-full overflow-hidden">
-              <div className="h-full bg-green-500 transition-all duration-500" style={{ width: `${progress}%` }}></div>
-            </div>
-            <span className="text-xs text-stone-500 font-medium">{completed}/{total} Done Today</span>
+          <div className="space-y-1.5">
+             <div className="flex justify-between items-end text-xs font-bold">
+                <span className={`${progress === 100 ? 'text-green-600 dark:text-green-400' : 'text-stone-500 dark:text-stone-400'}`}>
+                   {progress === 100 ? 'Complete!' : `${progress}% Complete`}
+                </span>
+                <span className="text-stone-400">{completed}/{total}</span>
+             </div>
+             <div className="h-2.5 w-full bg-stone-200 dark:bg-stone-700 rounded-full overflow-hidden">
+               <div className={`h-full ${progressColor} transition-all duration-700 ease-out`} style={{ width: `${progress}%` }}></div>
+             </div>
           </div>
         </div>
-        {isOpen ? <ChevronUp className="text-rose-500 shrink-0" /> : <ChevronDown className="text-stone-400 shrink-0" />}
+        <div className={`ml-4 p-2 rounded-full transition-colors ${isOpen ? 'bg-white/50 dark:bg-black/20 text-rose-600' : 'bg-stone-100 dark:bg-stone-800 text-stone-400'}`}>
+             {isOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+        </div>
       </button>
 
       {isOpen && (
         <div className="px-5 pb-8 border-t border-rose-100 dark:border-rose-900/30 animate-fade-in bg-stone-50/50 dark:bg-stone-950/50">
           <p className="text-stone-600 dark:text-stone-300 text-sm leading-relaxed py-4 max-w-2xl">{phase.description}</p>
           {phase.culturalTip && (
-            <div className="mb-6 bg-purple-50 dark:bg-purple-900/20 p-4 rounded-xl border border-purple-100 dark:border-purple-900/30 flex items-start gap-3 shadow-sm">
-              <Globe className="text-purple-600 dark:text-purple-400 mt-1 shrink-0" size={18} />
-              <div>
-                <span className="block text-xs font-bold text-purple-700 dark:text-purple-300 uppercase mb-1">Holistic Wellness</span>
-                <p className="text-sm text-purple-900 dark:text-purple-100 leading-relaxed">{phase.culturalTip}</p>
+            <div 
+              onClick={() => setIsTipExpanded(!isTipExpanded)}
+              className="mb-6 bg-purple-50 dark:bg-purple-900/20 p-4 rounded-xl border border-purple-100 dark:border-purple-900/30 flex items-start gap-3 shadow-sm cursor-pointer hover:bg-purple-100/50 dark:hover:bg-purple-900/30 transition-colors group"
+            >
+              <Globe className="text-purple-600 dark:text-purple-400 mt-1 shrink-0 group-hover:scale-110 transition-transform" size={18} />
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-1">
+                   <span className="block text-xs font-bold text-purple-700 dark:text-purple-300 uppercase">Holistic Wellness</span>
+                   <div className="text-purple-400">
+                     {isTipExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                   </div>
+                </div>
+                <p className={`text-sm text-purple-900 dark:text-purple-100 leading-relaxed ${isTipExpanded ? '' : 'line-clamp-1 opacity-80'}`}>
+                  {phase.culturalTip}
+                </p>
               </div>
             </div>
           )}
@@ -349,12 +365,104 @@ const PhaseCard: React.FC<{
   );
 };
 
+// Circular Progress Component for Summary
+const DailyProgressRing: React.FC<{ progress: number }> = ({ progress }) => {
+  const radius = 30;
+  const stroke = 6;
+  const normalizedRadius = radius - stroke * 2;
+  const circumference = normalizedRadius * 2 * Math.PI;
+  const strokeDashoffset = circumference - (progress / 100) * circumference;
+
+  return (
+    <div className="relative w-24 h-24 flex items-center justify-center">
+       <svg height={radius * 2} width={radius * 2} className="rotate-[-90deg]">
+         <circle
+           stroke="rgba(255, 255, 255, 0.1)"
+           strokeWidth={stroke}
+           fill="transparent"
+           r={normalizedRadius}
+           cx={radius}
+           cy={radius}
+         />
+         <circle
+           stroke="currentColor"
+           fill="transparent"
+           strokeWidth={stroke}
+           strokeDasharray={circumference + ' ' + circumference}
+           style={{ strokeDashoffset, transition: 'stroke-dashoffset 0.8s ease-in-out' }}
+           strokeLinecap="round"
+           r={normalizedRadius}
+           cx={radius}
+           cy={radius}
+           className="text-rose-400"
+         />
+       </svg>
+       <div className="absolute flex flex-col items-center">
+         <span className="text-xl font-bold text-white">{progress}%</span>
+       </div>
+    </div>
+  );
+};
+
 const RecoveryPlanView: React.FC<Props> = ({ plan, logs, onToggleExercise }) => {
+  const { t } = useLanguage();
+  
+  // Logic to augment plan if fewer than 3 breathing exercises exist
+  const displayPlan = useMemo(() => {
+    // Clone plan to avoid mutating props
+    const augmented = JSON.parse(JSON.stringify(plan)) as RecoveryPlan;
+    
+    // Count breathing exercises (specifically checks lying_back + breath keywords)
+    let breathingCount = 0;
+    augmented.phases.forEach(phase => {
+      phase.exercises.forEach(ex => {
+        if (ex.visualTag === 'lying_back' && 
+           (ex.name.toLowerCase().includes('breath') || ex.description.toLowerCase().includes('breath') || ex.benefits.toLowerCase().includes('breath'))) {
+          breathingCount++;
+        }
+      });
+    });
+
+    // Inject 'Diaphragmatic Breath Hold' if needed
+    if (breathingCount < 3 && augmented.phases.length > 0) {
+      const breathingExercise: Exercise = {
+        name: 'Diaphragmatic Breath Hold',
+        reps: '3-5 breaths',
+        frequency: '1-2x per day',
+        description: 'Deep belly breathing to activate the transverse abdominis and promote relaxation.',
+        benefits: 'Helps calm the nervous system, aids in re-engaging deep core muscles postpartum, and can reduce stress.',
+        howTo: [
+          'Lie comfortably on your back with knees bent and feet flat on the floor.',
+          'Place one hand on your chest and the other on your belly.',
+          'Inhale slowly through your nose, allowing your belly to rise more than your chest.',
+          'Hold your breath for 2-3 seconds at the peak of the inhale.',
+          'Exhale slowly through your mouth, feeling your belly fall.',
+          'Repeat for 5-8 cycles.'
+        ],
+        whenToAvoid: 'Stop if you feel any dizziness or discomfort.',
+        visualTag: 'lying_back'
+      };
+
+      // Add to first phase (Reconnection & Restore) if not already present
+      const phase1 = augmented.phases[0];
+      if (!phase1.exercises.some(e => e.name === breathingExercise.name)) {
+        phase1.exercises.unshift(breathingExercise);
+      }
+    }
+    
+    return augmented;
+  }, [plan]);
+
   const [openPhase, setOpenPhase] = useState<number>(0);
-  // Lifted state: logs are now passed in props
   const today = getTodayDate();
   const todaysLogs = logs[today] || [];
   const streak = calculateStreak(logs);
+
+  // Calculate daily progress based on OPEN/ACTIVE phase
+  const activePhase = displayPlan.phases[openPhase !== -1 ? openPhase : 0];
+  const activeTotal = activePhase?.exercises.length || 0;
+  const activeCompleted = activePhase?.exercises.filter(ex => todaysLogs.includes(ex.name)).length || 0;
+  const activeProgress = activeTotal > 0 ? Math.round((activeCompleted / activeTotal) * 100) : 0;
 
   return (
     <div className="max-w-6xl mx-auto pb-12 animate-fade-in-up">
@@ -362,23 +470,30 @@ const RecoveryPlanView: React.FC<Props> = ({ plan, logs, onToggleExercise }) => 
       <div className="bg-stone-900 dark:bg-stone-800 rounded-2xl p-6 md:p-8 text-white mb-8 shadow-xl border-b-4 border-rose-500 relative overflow-hidden">
         <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-8">
            <div className="md:col-span-2">
-             <h1 className="text-2xl md:text-3xl font-bold mb-2">Welcome Back, Mama</h1>
-             <p className="text-stone-300 leading-relaxed text-sm md:text-base opacity-90">{plan.summary}</p>
+             <h1 className="text-2xl md:text-3xl font-bold mb-2">{t('welcome')}</h1>
+             <p className="text-stone-300 leading-relaxed text-sm md:text-base opacity-90">{displayPlan.summary}</p>
              
              {/* Integrated Weekly Progress */}
              <WeeklyTracker logs={logs} />
            </div>
            
-           <div className="flex gap-4 md:justify-end items-start">
-              <div className="bg-white/10 backdrop-blur-md p-4 rounded-xl border border-white/10 text-center min-w-[100px]">
-                 <div className="flex justify-center text-amber-400 mb-1"><Flame size={20} fill="currentColor" /></div>
-                 <div className="text-2xl font-bold">{streak}</div>
-                 <div className="text-xs text-stone-400 uppercase tracking-wide">Day Streak</div>
+           <div className="flex gap-4 md:justify-end items-center">
+              <div className="hidden md:block">
+                  <DailyProgressRing progress={activeProgress} />
+                  <div className="text-center text-[10px] uppercase font-bold text-white/60 mt-1 tracking-wider">Phase Progress</div>
               </div>
-              <div className="bg-white/10 backdrop-blur-md p-4 rounded-xl border border-white/10 text-center min-w-[100px]">
-                 <div className="flex justify-center text-green-400 mb-1"><CheckCircle size={20} /></div>
-                 <div className="text-2xl font-bold">{todaysLogs.length}</div>
-                 <div className="text-xs text-stone-400 uppercase tracking-wide">Done Today</div>
+              
+              <div className="flex flex-col gap-3">
+                <div className="bg-white/10 backdrop-blur-md p-3 px-4 rounded-xl border border-white/10 text-center min-w-[90px]">
+                   <div className="flex justify-center text-amber-400 mb-1"><Flame size={18} fill="currentColor" /></div>
+                   <div className="text-xl font-bold leading-none">{streak}</div>
+                   <div className="text-[10px] text-stone-400 uppercase tracking-wide mt-1">Streak</div>
+                </div>
+                <div className="bg-white/10 backdrop-blur-md p-3 px-4 rounded-xl border border-white/10 text-center min-w-[90px]">
+                   <div className="flex justify-center text-green-400 mb-1"><CheckCircle size={18} /></div>
+                   <div className="text-xl font-bold leading-none">{todaysLogs.length}</div>
+                   <div className="text-[10px] text-stone-400 uppercase tracking-wide mt-1">Done</div>
+                </div>
               </div>
            </div>
         </div>
@@ -388,10 +503,10 @@ const RecoveryPlanView: React.FC<Props> = ({ plan, logs, onToggleExercise }) => 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 order-2 lg:order-1">
           <div className="flex items-center justify-between mb-6">
-             <h2 className="text-xl font-bold text-stone-800 dark:text-stone-100">Daily Plan</h2>
+             <h2 className="text-xl font-bold text-stone-800 dark:text-stone-100">{t('dailyPlan')}</h2>
              <span className="text-xs font-bold text-stone-500 dark:text-stone-400 bg-stone-200 dark:bg-stone-800 px-3 py-1 rounded-full">{getTodayDate()}</span>
           </div>
-          {plan.phases.map((phase, idx) => (
+          {displayPlan.phases.map((phase, idx) => (
             <PhaseCard 
               key={idx} 
               phase={phase} 
@@ -407,19 +522,19 @@ const RecoveryPlanView: React.FC<Props> = ({ plan, logs, onToggleExercise }) => 
            <div className="lg:sticky lg:top-24 space-y-6">
               <div className="bg-indigo-50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-900/30 rounded-2xl p-6 shadow-sm">
                  <h3 className="text-indigo-900 dark:text-indigo-200 font-bold mb-3 text-lg flex items-center gap-2">
-                   <AlertOctagon size={20} /> AI Video Lab
+                   <AlertOctagon size={20} /> {t('aiLab')}
                  </h3>
                  <p className="text-indigo-800 dark:text-indigo-300 text-sm mb-5 leading-relaxed">
-                   Check your form for <strong>{plan.phases[openPhase !== -1 ? openPhase : 0]?.exercises[0]?.name || "Core Engagement"}</strong>.
+                   Check your form for <strong>{activePhase?.exercises[0]?.name || "Core Engagement"}</strong>.
                  </p>
-                 <VideoLab exerciseName={plan.phases[openPhase !== -1 ? openPhase : 0]?.exercises[0]?.name || "Core Engagement"} />
+                 <VideoLab exerciseName={activePhase?.exercises[0]?.name || "Core Engagement"} />
               </div>
-              {plan.diastasisNote && (
+              {displayPlan.diastasisNote && (
                   <div className="bg-amber-50 dark:bg-amber-900/10 p-5 rounded-xl border border-amber-100 dark:border-amber-900/30">
                     <div className="flex items-center gap-2 font-bold text-amber-800 dark:text-amber-200 mb-2 text-sm uppercase tracking-wide">
                       <Info size={16} /> Diastasis Care
                     </div>
-                    <p className="text-sm text-amber-900 dark:text-amber-100 leading-relaxed">{plan.diastasisNote}</p>
+                    <p className="text-sm text-amber-900 dark:text-amber-100 leading-relaxed">{displayPlan.diastasisNote}</p>
                   </div>
                )}
            </div>

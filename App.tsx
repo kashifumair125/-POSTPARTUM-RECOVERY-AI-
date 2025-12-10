@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { AssessmentForm } from './components/AssessmentForm';
 import RecoveryPlanView from './components/RecoveryPlanView';
@@ -10,9 +11,11 @@ import { generateRecoveryRoadmap } from './services/geminiService';
 import { loadState, saveState, clearState, toggleExerciseCompletion } from './services/storageService';
 import { supabase, saveCloudData, loadCloudData } from './services/supabaseClient';
 import { RecoveryPlan, AppState, ChatMessage } from './types';
-import { Loader2, Sparkles, AlertTriangle, RefreshCw, Moon, Sun, Heart, Shield, Bell, MessageSquare, User, LogOut, Cloud, ChevronDown, CheckCircle } from 'lucide-react';
+import { Loader2, Sparkles, AlertTriangle, RefreshCw, Moon, Sun, Heart, Shield, Bell, MessageSquare, User, LogOut, Cloud, ChevronDown, CheckCircle, Globe } from 'lucide-react';
+import { LanguageProvider, useLanguage, Language } from './contexts/LanguageContext';
 
-export default function App() {
+function AppContent() {
+  const { t, language, setLanguage, dir } = useLanguage();
   const [appState, setAppState] = useState<AppState>(loadState());
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -83,21 +86,16 @@ export default function App() {
     try {
       const cloudData = await loadCloudData(userId);
       if (cloudData) {
-        // Merge strategy: Cloud usually wins if it exists, or prompt user.
-        // For simplicity, we'll assume cloud data is the source of truth if it exists,
-        // but we preserve local settings if cloud settings are missing.
         const mergedState = { ...cloudData, settings: { ...appState.settings, ...cloudData.settings } };
         setAppState(mergedState);
-        saveState(mergedState); // Update local storage too
+        saveState(mergedState); 
       } else {
-        // No cloud data, push local data to cloud
         await saveCloudData(userId, appState);
       }
     } catch (e) {
       console.error("Sync error", e);
     } finally {
       setSyncing(false);
-      // Allow some time for state to settle before enabling auto-save again
       setTimeout(() => {
         isHydratingRef.current = false;
       }, 1000);
@@ -108,9 +106,6 @@ export default function App() {
     if (supabase) {
       await supabase.auth.signOut();
       setUser(null);
-      // Optional: Clear local state on logout? 
-      // For now, we keep it to allow offline usage, but you might want to clear sensitive data.
-      // clearState(); 
     }
   };
 
@@ -150,7 +145,8 @@ export default function App() {
         }
       };
 
-      const recoveryPlan = await generateRecoveryRoadmap(userProfile);
+      // Pass language to generating service
+      const recoveryPlan = await generateRecoveryRoadmap(userProfile, language);
       
       const newState = {
         ...appState,
@@ -191,7 +187,7 @@ export default function App() {
     if (permission === "granted") {
       new Notification("PostpartumAI Reminders Enabled", {
         body: "Great! We'll help you stay consistent with your recovery.",
-        icon: "/icon-192.png" // Assumes PWA icon
+        icon: "/icon-192.png" 
       });
       const newState = { ...appState, settings: { ...appState.settings, remindersEnabled: true } };
       setAppState(newState);
@@ -204,7 +200,7 @@ export default function App() {
   };
 
   return (
-    <div className={`min-h-screen font-sans transition-colors duration-300 ${appState.settings.theme === 'dark' ? 'bg-stone-950 text-stone-100' : 'bg-rose-50/50 text-stone-800'}`}>
+    <div className={`min-h-screen font-sans transition-colors duration-300 ${appState.settings.theme === 'dark' ? 'bg-stone-950 text-stone-100' : 'bg-rose-50/50 text-stone-800'}`} dir={dir}>
       
       {/* Header */}
       <header className={`sticky top-0 z-40 backdrop-blur-md border-b transition-colors duration-300 ${appState.settings.theme === 'dark' ? 'bg-stone-900/80 border-stone-800' : 'bg-white/80 border-rose-100'}`}>
@@ -224,10 +220,38 @@ export default function App() {
                  <Cloud size={14} /> Saving...
                </div>
              )}
+
+             {/* Language Selector */}
+             <div className="relative group">
+                <button className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors flex items-center gap-1">
+                  <Globe size={18} className={appState.settings.theme === 'dark' ? 'text-stone-400' : 'text-stone-600'} />
+                  <span className="text-xs font-bold uppercase">{language}</span>
+                </button>
+                <div className="absolute right-0 top-full mt-2 w-32 bg-white dark:bg-stone-900 rounded-xl shadow-xl border border-stone-100 dark:border-stone-800 overflow-hidden hidden group-hover:block animate-fade-in">
+                  {[
+                    {code: 'en', label: 'English'},
+                    {code: 'es', label: 'Español'},
+                    {code: 'fr', label: 'Français'},
+                    {code: 'de', label: 'Deutsch'},
+                    {code: 'ar', label: 'العربية'},
+                    {code: 'hi', label: 'हिन्दी'},
+                    {code: 'zh', label: '中文'},
+                    {code: 'ja', label: '日本語'},
+                  ].map(l => (
+                    <button 
+                      key={l.code} 
+                      onClick={() => setLanguage(l.code as Language)}
+                      className={`w-full text-left px-4 py-2 text-xs font-medium hover:bg-rose-50 dark:hover:bg-rose-900/20 ${language === l.code ? 'text-rose-600 font-bold' : 'text-stone-600 dark:text-stone-400'}`}
+                    >
+                      {l.label}
+                    </button>
+                  ))}
+                </div>
+             </div>
              
              {appState.plan && (
                <button onClick={clearState} className={`hidden md:flex text-sm font-medium transition-colors items-center gap-1 ${appState.settings.theme === 'dark' ? 'text-stone-400 hover:text-rose-400' : 'text-stone-500 hover:text-rose-600'}`}>
-                 <RefreshCw size={14} /> Reset
+                 <RefreshCw size={14} /> {t('reset')}
                </button>
              )}
              
@@ -258,7 +282,7 @@ export default function App() {
                 onClick={() => setShowAuth(true)}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-rose-100 dark:bg-rose-900/30 text-xs font-bold text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 hover:bg-rose-200 dark:hover:bg-rose-900/50 transition-colors"
                >
-                 <User size={14} /> <span className="hidden sm:inline">Sign In</span>
+                 <User size={14} /> <span className="hidden sm:inline">{t('signIn')}</span>
                </button>
              )}
           </div>
@@ -291,7 +315,7 @@ export default function App() {
             </div>
             <h2 className={`text-2xl font-bold text-center ${appState.settings.theme === 'dark' ? 'text-stone-100' : 'text-stone-800'}`}>Crafting Your Recovery Journey</h2>
             <p className={`mt-3 max-w-md text-center text-lg leading-relaxed ${appState.settings.theme === 'dark' ? 'text-stone-400' : 'text-stone-600'}`}>
-              Analyzing your physiology and symptoms to build a safe, personalized roadmap just for you...
+              {t('analyzing')}
             </p>
           </div>
         ) : !appState.plan ? (
@@ -359,15 +383,14 @@ export default function App() {
                    <Bell size={14} /> {appState.settings.remindersEnabled ? 'Reminders On' : 'Enable Reminders'}
                 </button>
                 <button onClick={() => setShowFeedback(true)} className={`flex items-center gap-1 ${appState.settings.theme === 'dark' ? 'text-stone-400 hover:text-rose-400' : 'text-stone-500 hover:text-rose-600'}`}>
-                   <MessageSquare size={14} /> Feedback
+                   <MessageSquare size={14} /> {t('feedback')}
                 </button>
              </div>
           </div>
           
           <div className="pt-8 border-t border-stone-200 dark:border-stone-800 text-center">
             <p className="text-xs md:text-sm mb-2 max-w-2xl mx-auto opacity-70">
-              <strong>Medical Disclaimer:</strong> This AI assistant is for informational purposes only. It is not a substitute for professional medical advice, diagnosis, or treatment. 
-              Always seek the advice of your physician or qualified health provider.
+              <strong>{t('medicalDisclaimer')}</strong>
             </p>
             <p className="text-xs opacity-50 mt-4">© 2024 PostpartumAI. All rights reserved.</p>
           </div>
@@ -405,18 +428,20 @@ export default function App() {
         </div>
       )}
 
-      {/* PRIVACY MODAL */}
       {showPrivacy && <PrivacyModal onClose={() => setShowPrivacy(false)} />}
-
-      {/* ABOUT MODAL */}
       {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
-
-      {/* FEEDBACK MODAL */}
       {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
-
-      {/* AUTH MODAL */}
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} onLoginSuccess={() => setShowAuth(false)} />}
 
     </div>
   );
 }
+
+export default function App() {
+  return (
+    <LanguageProvider>
+      <AppContent />
+    </LanguageProvider>
+  );
+}
+    

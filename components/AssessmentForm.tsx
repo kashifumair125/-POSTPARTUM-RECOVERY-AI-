@@ -1,5 +1,7 @@
+
 import React, { useState } from 'react';
 import { ArrowLeft, ArrowRight, CheckCircle2, Battery, AlertCircle, Activity } from 'lucide-react';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface AssessmentData {
   delivery: 'vaginal' | 'csection';
@@ -29,6 +31,7 @@ interface Props {
 }
 
 export const AssessmentForm: React.FC<Props> = ({ onSubmit, isLoading }) => {
+  const { t, language } = useLanguage();
   const [step, setStep] = useState<number>(1);
   const [formData, setFormData] = useState<AssessmentData>({
     delivery: 'vaginal',
@@ -73,11 +76,11 @@ export const AssessmentForm: React.FC<Props> = ({ onSubmit, isLoading }) => {
     <div className="max-w-xl mx-auto bg-white dark:bg-stone-900 rounded-2xl shadow-xl border border-stone-100 dark:border-stone-800 overflow-hidden">
       <div className="bg-stone-900 dark:bg-stone-950 p-6 text-white text-center">
         <h2 className="text-xl font-bold tracking-wide">
-          {step === 1 && "Step 1: The Basics"}
-          {step === 2 && "Step 2: Body Check"}
-          {step === 3 && "Step 3: Capabilities"}
+          {step === 1 && `Step 1: ${t('step1')}`}
+          {step === 2 && `Step 2: ${t('step2')}`}
+          {step === 3 && `Step 3: ${t('step3')}`}
         </h2>
-        <p className="text-stone-400 text-sm mt-1">Personalizing your 12-week roadmap</p>
+        <p className="text-stone-400 text-sm mt-1">{t('subtitle')}</p>
       </div>
 
       <div className="p-6 md:p-8">
@@ -87,7 +90,7 @@ export const AssessmentForm: React.FC<Props> = ({ onSubmit, isLoading }) => {
           {step === 1 && (
             <>
               <div>
-                <label className="block text-sm font-bold text-stone-800 dark:text-stone-200 mb-3">Delivery Type</label>
+                <label className="block text-sm font-bold text-stone-800 dark:text-stone-200 mb-3">{t('deliveryType')}</label>
                 <div className="grid grid-cols-2 gap-4">
                   {(['vaginal', 'csection'] as const).map(type => (
                     <button
@@ -100,7 +103,7 @@ export const AssessmentForm: React.FC<Props> = ({ onSubmit, isLoading }) => {
                           : 'border-stone-100 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-600 dark:text-stone-300 hover:border-stone-200 dark:hover:border-stone-600'
                       }`}
                     >
-                      {type === 'vaginal' ? 'Vaginal Delivery' : 'C-Section'}
+                      {type === 'vaginal' ? t('vaginal') : t('csection')}
                     </button>
                   ))}
                 </div>
@@ -108,7 +111,7 @@ export const AssessmentForm: React.FC<Props> = ({ onSubmit, isLoading }) => {
 
               <div>
                 <label className="block text-sm font-bold text-stone-800 dark:text-stone-200 mb-3">
-                  Weeks Postpartum: <span className="text-rose-600 dark:text-rose-400 text-lg">{formData.weeksPostpartum}</span>
+                  {t('weeksPP')}: <span className="text-rose-600 dark:text-rose-400 text-lg">{formData.weeksPostpartum}</span>
                 </label>
                 <input
                   type="range"
@@ -136,7 +139,7 @@ export const AssessmentForm: React.FC<Props> = ({ onSubmit, isLoading }) => {
               </div>
               
                <div>
-                <label className="block text-sm font-bold text-stone-800 dark:text-stone-200 mb-2">Any Specific Body Concerns?</label>
+                <label className="block text-sm font-bold text-stone-800 dark:text-stone-200 mb-2">Specific Body Concerns?</label>
                 <textarea
                   value={formData.bodyConcerns}
                   onChange={(e) => updateField('bodyConcerns', e.target.value)}
@@ -203,7 +206,7 @@ export const AssessmentForm: React.FC<Props> = ({ onSubmit, isLoading }) => {
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-stone-800 dark:text-stone-200 mb-3">3. Do you experience any of these?</label>
+                <label className="block text-sm font-bold text-stone-800 dark:text-stone-200 mb-3">3. {t('symptoms')}?</label>
                 <div className="grid grid-cols-1 gap-2">
                   {[
                     'Bulging when coughing/sneezing',
@@ -300,7 +303,7 @@ export const AssessmentForm: React.FC<Props> = ({ onSubmit, isLoading }) => {
                 onClick={prevStep}
                 className="flex-1 py-3 px-4 border border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 font-semibold rounded-xl hover:bg-stone-50 dark:hover:bg-stone-800 flex items-center justify-center gap-2"
               >
-                <ArrowLeft size={18} /> Back
+                <ArrowLeft size={18} /> {t('back')}
               </button>
             )}
             
@@ -310,7 +313,7 @@ export const AssessmentForm: React.FC<Props> = ({ onSubmit, isLoading }) => {
                 onClick={nextStep}
                 className="flex-1 py-3 px-4 bg-stone-900 dark:bg-stone-700 text-white font-semibold rounded-xl hover:bg-stone-800 dark:hover:bg-stone-600 flex items-center justify-center gap-2"
               >
-                Next <ArrowRight size={18} />
+                {t('next')} <ArrowRight size={18} />
               </button>
             ) : (
                <button
@@ -318,7 +321,7 @@ export const AssessmentForm: React.FC<Props> = ({ onSubmit, isLoading }) => {
                 disabled={isLoading}
                 className="flex-1 py-3 px-4 bg-rose-600 text-white font-semibold rounded-xl hover:bg-rose-700 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-rose-200 dark:shadow-none"
               >
-                {isLoading ? 'Analyzing...' : 'Generate Plan'} <CheckCircle2 size={18} />
+                {isLoading ? t('analyzing') : t('generate')} <CheckCircle2 size={18} />
               </button>
             )}
           </div>
@@ -327,3 +330,4 @@ export const AssessmentForm: React.FC<Props> = ({ onSubmit, isLoading }) => {
     </div>
   );
 };
+    

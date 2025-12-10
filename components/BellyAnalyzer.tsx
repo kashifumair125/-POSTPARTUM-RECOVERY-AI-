@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { analyzeDiastasisImage } from '../services/geminiService';
 import { DiastasisAnalysis } from '../types';
-import { Camera, AlertCircle, Loader2 } from 'lucide-react';
+import { Camera, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
 
 interface Props {
   weeksPostpartum: number;
@@ -13,6 +13,10 @@ const BellyAnalyzer: React.FC<Props> = ({ weeksPostpartum, onAnalysisComplete, o
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  
+  // New State for Symptoms
+  const [hasBulge, setHasBulge] = useState(false);
+  const [hasPain, setHasPain] = useState(false);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -22,7 +26,8 @@ const BellyAnalyzer: React.FC<Props> = ({ weeksPostpartum, onAnalysisComplete, o
       setAnalyzing(true);
       
       try {
-        const result = await analyzeDiastasisImage(file, weeksPostpartum);
+        // Pass symptoms to service
+        const result = await analyzeDiastasisImage(file, weeksPostpartum, { bulging: hasBulge, pain: hasPain });
         onAnalysisComplete(result);
       } catch (err: any) {
         setError(err.message || "Failed to analyze image");
@@ -41,16 +46,50 @@ const BellyAnalyzer: React.FC<Props> = ({ weeksPostpartum, onAnalysisComplete, o
       </div>
 
       <p className="text-stone-600 dark:text-stone-300 mb-6 text-sm leading-relaxed">
-        Upload a photo of your abdomen while lying down and performing a slight "crunch" (lifting head). 
-        This helps our AI estimate the gap between your abdominal muscles.
+        To get the most accurate safety recommendation, please answer these quick questions before uploading your photo.
       </p>
+
+      {/* Symptom Questionnaire */}
+      <div className="mb-6 space-y-3">
+         <label className={`flex items-start gap-3 p-3 border rounded-xl cursor-pointer transition-all ${hasBulge ? 'border-rose-500 bg-rose-50 dark:bg-rose-900/10' : 'border-stone-200 dark:border-stone-700 hover:bg-stone-50 dark:hover:bg-stone-800'}`}>
+            <div className="mt-0.5">
+               <input 
+                 type="checkbox" 
+                 checked={hasBulge} 
+                 onChange={e => setHasBulge(e.target.checked)} 
+                 className="w-5 h-5 accent-rose-600 rounded" 
+               />
+            </div>
+            <div>
+               <span className="block text-sm font-semibold text-stone-800 dark:text-stone-200">Visible Bulging or "Doming"</span>
+               <span className="text-xs text-stone-500 dark:text-stone-400">Do you see a ridge running down your midline when you lift your head or cough?</span>
+            </div>
+         </label>
+
+         <label className={`flex items-start gap-3 p-3 border rounded-xl cursor-pointer transition-all ${hasPain ? 'border-rose-500 bg-rose-50 dark:bg-rose-900/10' : 'border-stone-200 dark:border-stone-700 hover:bg-stone-50 dark:hover:bg-stone-800'}`}>
+            <div className="mt-0.5">
+               <input 
+                 type="checkbox" 
+                 checked={hasPain} 
+                 onChange={e => setHasPain(e.target.checked)} 
+                 className="w-5 h-5 accent-rose-600 rounded" 
+               />
+            </div>
+            <div>
+               <span className="block text-sm font-semibold text-stone-800 dark:text-stone-200">Pain or Discomfort</span>
+               <span className="text-xs text-stone-500 dark:text-stone-400">Do you experience lower back pain or pelvic floor heaviness?</span>
+            </div>
+         </label>
+      </div>
+
+      <div className="text-xs font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wide mb-2">Upload Photo</div>
 
       <div className="border-2 border-dashed border-stone-300 dark:border-stone-700 rounded-xl p-6 md:p-10 text-center bg-stone-50 dark:bg-stone-950 transition-colors hover:bg-stone-100 dark:hover:bg-stone-900 relative min-h-[200px] flex flex-col justify-center items-center group cursor-pointer">
         {analyzing ? (
           <div className="flex flex-col items-center py-4">
             <Loader2 className="animate-spin text-rose-600 dark:text-rose-500 mb-3" size={32} />
             <p className="text-sm font-medium text-stone-600 dark:text-stone-300">Analyzing tissue integrity...</p>
-            <p className="text-xs text-stone-500 dark:text-stone-400 mt-1">Privacy First: Your image is processed securely and never stored.</p>
+            <p className="text-xs text-stone-500 dark:text-stone-400 mt-1">Processing symptom context...</p>
           </div>
         ) : (
           <>
