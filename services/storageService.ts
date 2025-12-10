@@ -42,7 +42,13 @@ export const clearState = () => {
   }
 };
 
-export const getTodayDate = () => new Date().toISOString().split('T')[0];
+// Returns YYYY-MM-DD in User's Local Timezone (Not UTC)
+export const getTodayDate = () => {
+  const d = new Date();
+  const offset = d.getTimezoneOffset();
+  const localDate = new Date(d.getTime() - (offset * 60 * 1000));
+  return localDate.toISOString().split('T')[0];
+};
 
 export const toggleExerciseCompletion = (exerciseName: string, date: string = getTodayDate()) => {
   const state = loadState();
@@ -70,16 +76,42 @@ export const saveChatMessage = (message: ChatMessage) => {
 };
 
 export const calculateStreak = (logs: Record<string, string[]>) => {
-  const dates = Object.keys(logs).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-  if (dates.length === 0) return 0;
-
   const today = getTodayDate();
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+  
+  // Calculate yesterday in Local Time
+  const d = new Date();
+  const offset = d.getTimezoneOffset();
+  const localNow = new Date(d.getTime() - (offset * 60 * 1000));
+  localNow.setDate(localNow.getDate() - 1);
+  const yesterday = localNow.toISOString().split('T')[0];
 
   let streak = 0;
-  let currentCheckDate = (dates[0] === today || dates[0] === yesterday) ? dates[0] : null;
+  
+  // A streak is active if we have logs for Today OR Yesterday.
+  // We start checking backwards from the most recent active day.
+  let currentCheckDate: string | null = null;
 
-  if (!currentCheckDate) return 0;
+  if (logs[today] && logs[today].length > 0) {
+    currentCheckDate = today;
+  } else if (logs[yesterday] && logs[yesterday].length > 0) {
+    currentCheckDate = yesterday;
+  } else {
+    return 0; // Streak broken
+  }
 
-  return dates.length; // Simplified streak for MVP
+  // Iterate backwards to count consecutive days
+  while (currentCheckDate) {
+    if (logs[currentCheckDate] && logs[currentCheckDate].length > 0) {
+      streak++;
+      // Go to previous day
+      // Note: We use the date string to construct UTC date for math, which is safe for YYYY-MM-DD arithmetic
+      const prev = new Date(currentCheckDate);
+      prev.setDate(prev.getDate() - 1);
+      currentCheckDate = prev.toISOString().split('T')[0];
+    } else {
+      break; 
+    }
+  }
+
+  return streak;
 };

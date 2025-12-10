@@ -23,6 +23,10 @@ const ExerciseAnimation: React.FC<Props> = ({ visualTag, exerciseName, descripti
   const controlsRef = useRef<any>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   
+  // Update name ref to access in animate loop without re-binding
+  const nameRef = useRef(exerciseName);
+  useEffect(() => { nameRef.current = exerciseName; }, [exerciseName]);
+  
   // References for animation manipulation
   const bodyPartsRef = useRef<Record<string, THREE.Mesh>>({});
   const guideLinesRef = useRef<THREE.Line[]>([]);
@@ -103,22 +107,25 @@ const ExerciseAnimation: React.FC<Props> = ({ visualTag, exerciseName, descripti
     
     if (type === 'skin') {
        if (mode === 'color') {
-           // Improved SSS Simulation: Deeper, richer gradient for skin tone depth
-           gradient.addColorStop(0, '#a67c74');    // Shadow/Blood-rich area
-           gradient.addColorStop(0.3, '#dcaaa0'); // Mid-tone
-           gradient.addColorStop(0.5, '#f5d0c0'); // Highlight/Surface
-           gradient.addColorStop(0.7, '#dcaaa0');
-           gradient.addColorStop(1, '#a67c74');
+           // Refined SSS Simulation: More complex gradient for realistic flesh tones
+           // Simulates blood flow/depth with darker reds in "shadow" areas of the gradient.
+           // Adjusted to be slightly lighter to allow dynamic lighting to work better.
+           gradient.addColorStop(0, '#8a6058');    // Deep sub-dermal shadow
+           gradient.addColorStop(0.2, '#d6b2aa'); // Vascular mid-tone
+           gradient.addColorStop(0.4, '#f5e0d7'); // Surface skin
+           gradient.addColorStop(0.6, '#fdf0e6'); // Highlight
+           gradient.addColorStop(0.8, '#d6b2aa'); // Vascular mid-tone
+           gradient.addColorStop(1, '#8a6058');    // Deep shadow
        } else {
-           // Bump Map Base
+           // Bump Map Base - Neutral Grey
            gradient.addColorStop(0, '#808080');
            gradient.addColorStop(1, '#808080');
        }
     } else {
        // Fabric Base
-       gradient.addColorStop(0, '#606060');
-       gradient.addColorStop(0.5, '#808080');
-       gradient.addColorStop(1, '#606060');
+       gradient.addColorStop(0, '#505050');
+       gradient.addColorStop(0.5, '#707070');
+       gradient.addColorStop(1, '#505050');
     }
     
     ctx.fillStyle = gradient;
@@ -132,17 +139,17 @@ const ExerciseAnimation: React.FC<Props> = ({ visualTag, exerciseName, descripti
         let grain;
         if (type === 'skin') {
              if (mode === 'bump') {
-                 // Mixed frequency noise for realistic pores
-                 const highFreq = (Math.random() - 0.5) * 20; // Sharper pores
-                 const lowFreq = (Math.random() - 0.5) * 5;
+                 // High frequency noise for pores, low for general unevenness
+                 const highFreq = (Math.random() - 0.5) * 15; // Sharp pores
+                 const lowFreq = (Math.random() - 0.5) * 3;   // Skin texture
                  grain = highFreq + lowFreq;
              } else {
-                 // Color noise for skin pigmentation variation
-                 grain = (Math.random() - 0.5) * 8;
+                 // Color variation for skin pigmentation
+                 grain = (Math.random() - 0.5) * 12; 
              }
         } else {
-            // Fabric noise
-            grain = (Math.random() - 0.5) * 30;
+            // Fabric heavy weave noise
+            grain = (Math.random() - 0.5) * 35;
         }
         
         data[i] = Math.max(0, Math.min(255, data[i] + grain));
@@ -155,61 +162,62 @@ const ExerciseAnimation: React.FC<Props> = ({ visualTag, exerciseName, descripti
 
     // Detail Layers for Realism
     if (type === 'skin' && mode === 'color') {
-        // 1. Blotchiness (Uneven skin tone for realism - Asymmetry)
+        // 1. Blotchiness & Asymmetry
         ctx.globalCompositeOperation = 'overlay';
-        for (let i = 0; i < 60; i++) {
+        for (let i = 0; i < 120; i++) {
              const x = Math.random() * size;
              const y = Math.random() * size;
-             const r = 30 + Math.random() * 60;
-             // Subtle red/purple blotches for underlying blood vessels
-             ctx.fillStyle = Math.random() > 0.5 ? 'rgba(255, 180, 180, 0.04)' : 'rgba(100, 60, 80, 0.03)';
+             const r = 10 + Math.random() * 60;
+             // Varied vascular tones: Reddish vs Bluish
+             const isVein = Math.random() > 0.7;
+             ctx.fillStyle = isVein ? 'rgba(80, 70, 110, 0.05)' : 'rgba(255, 140, 140, 0.06)';
              ctx.beginPath();
              ctx.arc(x, y, r, 0, Math.PI * 2);
              ctx.fill();
         }
 
-        // 2. Subsurface Veins (Subtle blue/purple)
+        // 2. Fine Subsurface Veins
         ctx.globalCompositeOperation = 'multiply';
-        ctx.strokeStyle = 'rgba(80, 80, 140, 0.09)'; // Slightly purple/blue for veins
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(50, 70, 110, 0.08)'; // Visible but subtle blue veins (reduced opacity for realism)
         ctx.lineCap = 'round';
-        ctx.filter = 'blur(6px)'; // Heavy blur to put them "under" the skin
+        ctx.filter = 'blur(2px)'; // Soften edges for sub-dermal look
         
         const drawVein = (x: number, y: number, length: number, angle: number, width: number) => {
-            if (length < 15 || width < 0.5) return;
+            if (length < 8 || width < 0.3) return;
             ctx.lineWidth = width;
             ctx.beginPath();
             ctx.moveTo(x, y);
-            // Natural branching path
-            const cp1x = x + Math.cos(angle) * length * 0.5;
-            const cp1y = y + Math.sin(angle) * length * 0.5;
-            const endX = x + Math.cos(angle + (Math.random() - 0.5)) * length;
-            const endY = y + Math.sin(angle + (Math.random() - 0.5)) * length;
+            
+            // Organic curve
+            const cp1x = x + Math.cos(angle) * length * 0.4 + (Math.random()-0.5)*20;
+            const cp1y = y + Math.sin(angle) * length * 0.4 + (Math.random()-0.5)*20;
+            const endX = x + Math.cos(angle + (Math.random() - 0.5) * 0.5) * length;
+            const endY = y + Math.sin(angle + (Math.random() - 0.5) * 0.5) * length;
             
             ctx.quadraticCurveTo(cp1x, cp1y, endX, endY);
             ctx.stroke();
 
-            // Recursively draw branches
-            if (Math.random() > 0.6) {
-                drawVein(endX, endY, length * 0.7, angle + 0.4, width * 0.7);
-                drawVein(endX, endY, length * 0.7, angle - 0.4, width * 0.7);
+            // Branching
+            if (Math.random() > 0.3) {
+                drawVein(endX, endY, length * 0.7, angle + 0.6, width * 0.6);
+                drawVein(endX, endY, length * 0.7, angle - 0.6, width * 0.6);
             }
         };
 
-        // Draw veins in random clusters
-        for (let k = 0; k < 10; k++) {
-            drawVein(Math.random() * size, Math.random() * size, 250, Math.random() * Math.PI * 2, 5);
+        // Cluster veins near "wrists/neck" (simulated by random distribution)
+        for (let k = 0; k < 12; k++) {
+            drawVein(Math.random() * size, Math.random() * size, 120, Math.random() * Math.PI * 2, 2.5);
         }
         ctx.filter = 'none';
 
-        // 3. Moles & Freckles (Imperfections)
+        // 3. Moles & Imperfections (Asymmetry)
         ctx.globalCompositeOperation = 'source-over';
-        for(let k=0; k<35; k++) {
+        for(let k=0; k<25; k++) {
             const x = Math.random() * size;
             const y = Math.random() * size;
-            const r = 0.5 + Math.random() * 1.5;
-            // Varied brown tones
-            ctx.fillStyle = `rgba(${70 + Math.random()*20}, ${40 + Math.random()*20}, 30, ${0.4 + Math.random() * 0.3})`;
+            const r = 1 + Math.random() * 2.5;
+            // Darker brown spots
+            ctx.fillStyle = `rgba(${60 + Math.random()*20}, ${40 + Math.random()*15}, 30, ${0.4 + Math.random() * 0.3})`;
             ctx.beginPath();
             ctx.arc(x, y, r, 0, Math.PI*2);
             ctx.fill();
@@ -217,11 +225,10 @@ const ExerciseAnimation: React.FC<Props> = ({ visualTag, exerciseName, descripti
     }
 
     if (type === 'fabric') {
-        // Weave pattern overlay
         ctx.globalCompositeOperation = 'overlay';
-        ctx.fillStyle = 'rgba(0,0,0,0.15)';
-        for(let i=0; i<size; i+=4) {
-            ctx.fillRect(i, 0, 1, size);
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        for(let i=0; i<size; i+=3) {
+            ctx.fillRect(i, 0, 1, size); // Tighter weave
             ctx.fillRect(0, i, size, 1);
         }
     }
@@ -229,10 +236,8 @@ const ExerciseAnimation: React.FC<Props> = ({ visualTag, exerciseName, descripti
     const texture = new THREE.CanvasTexture(canvas);
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
-    
-    // Anisotropy improves texture quality at oblique angles
-    texture.anisotropy = 4;
-    texture.repeat.set(type === 'skin' ? 2 : 3, 2);
+    texture.anisotropy = 8; // Higher quality at angles
+    texture.repeat.set(type === 'skin' ? 2 : 4, 2);
     
     if (mode === 'color') {
         texture.colorSpace = THREE.SRGBColorSpace;
@@ -293,9 +298,9 @@ const ExerciseAnimation: React.FC<Props> = ({ visualTag, exerciseName, descripti
       });
       renderer.setSize(initialWidth, initialHeight);
       renderer.shadowMap.enabled = true;
-      renderer.shadowMap.type = THREE.PCFSoftShadowMap; // High quality soft shadows
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.0; 
+      renderer.toneMappingExposure = 1.1; // Slightly brighter
       mountRef.current.appendChild(renderer.domElement);
       rendererRef.current = renderer;
 
@@ -306,44 +311,44 @@ const ExerciseAnimation: React.FC<Props> = ({ visualTag, exerciseName, descripti
       controls.enableZoom = true;
       controls.minDistance = 2;
       controls.maxDistance = 7;
-      controls.maxPolarAngle = Math.PI / 2 - 0.05; // Stay above floor
+      controls.maxPolarAngle = Math.PI / 2 - 0.05;
       controls.target.set(0, 0.9, 0);
       controlsRef.current = controls;
 
-      // --- STUDIO LIGHTING SETUP (REFINED) ---
-      // 1. Ambient - Warm/Cool gradient bounce, moderate intensity for base visibility
-      const ambient = new THREE.HemisphereLight(0xffffff, 0x2a3b55, 0.5); 
+      // --- STUDIO LIGHTING SETUP (ENHANCED) ---
+      // 1. Ambient - Base visibility
+      const ambient = new THREE.HemisphereLight(0xffffff, 0x2a3b55, 0.7); 
       scene.add(ambient);
 
-      // 2. Key Light - Main source, warm, soft shadows
-      const keyLight = new THREE.DirectionalLight(0xfff7ed, 1.2);
+      // 2. Key Light - Warm main source
+      const keyLight = new THREE.DirectionalLight(0xfff5e6, 1.1); // Slightly softer key
       keyLight.position.set(3, 6, 5);
       keyLight.castShadow = true;
       keyLight.shadow.mapSize.width = 2048; 
       keyLight.shadow.mapSize.height = 2048;
-      keyLight.shadow.bias = -0.0001;
-      keyLight.shadow.radius = 10; // Increased for even softer shadows
+      keyLight.shadow.bias = -0.00005;
+      keyLight.shadow.radius = 8; 
       scene.add(keyLight);
 
-      // 3. Fill Light - Opposing the Key Light, cool tone, softer
-      // Adjusted position to be more opposite (-5, 4, 2)
-      const fillLight = new THREE.DirectionalLight(0xe6eeff, 0.6); 
-      fillLight.position.set(-5, 4, 2); 
+      // 3. Fill Light - Soft, cool, reduces harsh shadows on opposite side
+      // Balanced intensity to avoid "flat" look but lift shadows significantly
+      const fillLight = new THREE.DirectionalLight(0xcce0ff, 0.7); 
+      fillLight.position.set(-5, 2, 4); // Positioned opposite key
       scene.add(fillLight);
       
-      // 4. Rim Light - Strong backlight for silhouette
-      const rimLight = new THREE.SpotLight(0xc4b5fd, 3.5); 
-      rimLight.position.set(-4, 5, -4);
+      // 4. Rim Light - Separates model from background
+      const rimLight = new THREE.SpotLight(0xd8b4fe, 2.5); // Reduced intensity for realism
+      rimLight.position.set(-4, 5, -5);
       rimLight.lookAt(0, 0.5, 0);
       rimLight.penumbra = 0.5;
       scene.add(rimLight);
       
-      // 5. Bounce Light - Ground reflection
-      const bounceLight = new THREE.PointLight(0xffffff, 0.2);
-      bounceLight.position.set(0, -2, 2);
+      // 5. Bounce Light - Ground reflection uplift
+      const bounceLight = new THREE.PointLight(0xffffff, 0.3);
+      bounceLight.position.set(0, -1, 2);
       scene.add(bounceLight);
 
-      // Floor
+      // Floor Grid
       const gridHelper = new THREE.GridHelper(20, 20, 0x334155, 0x1e293b);
       gridHelper.position.y = 0.001;
       scene.add(gridHelper);
@@ -354,38 +359,38 @@ const ExerciseAnimation: React.FC<Props> = ({ visualTag, exerciseName, descripti
       const fabricTex = createTexture('fabric', 'bump'); 
       
       const skinMat = new THREE.MeshPhysicalMaterial({
-        color: 0xffffff,
+        color: 0xffeadd, // Slightly warmer base
         map: skinColorTex, 
         bumpMap: skinBumpTex,
-        bumpScale: 0.004, // Slightly deeper for pore visibility
-        roughness: 0.6, 
+        bumpScale: 0.004, 
+        roughness: 0.5,   
         roughnessMap: skinBumpTex, 
         metalness: 0.0,
-        sheen: 1.2,         // Simulates micro-hairs/velvet skin surface
-        sheenColor: 0xffd1d1, // Pinkish sheen for Subsurface Scattering approximation
-        sheenRoughness: 0.6,
-        clearcoat: 0.2,     // Natural oils
+        sheen: 1.2,       // Velvet skin effect
+        sheenColor: 0xffe0e0, // Slightly more subtle sheen
+        sheenRoughness: 0.5,
+        clearcoat: 0.15, // Natural skin oils
         clearcoatRoughness: 0.4,
-        ior: 1.45,
+        ior: 1.45,       // Skin IOR
       });
 
       const clothingTopMat = new THREE.MeshPhysicalMaterial({
         color: 0xf8fafc, 
-        roughness: 0.8, 
+        roughness: 0.85, 
         metalness: 0.0,
         bumpMap: fabricTex,
-        bumpScale: 0.01, 
+        bumpScale: 0.015, 
         sheen: 0.1
       });
 
       const clothingBotMat = new THREE.MeshPhysicalMaterial({
         color: 0x1e293b, 
-        roughness: 0.6, 
+        roughness: 0.65, 
         metalness: 0.1,
         bumpMap: fabricTex,
-        bumpScale: 0.005,
+        bumpScale: 0.008,
         clearcoat: 0.1,
-        sheen: 0.2,
+        sheen: 0.3,
         sheenColor: 0x475569
       });
 
@@ -618,16 +623,17 @@ const ExerciseAnimation: React.FC<Props> = ({ visualTag, exerciseName, descripti
         const time = timeRef.current;
         const sinWave = Math.sin(time);
         const absSin = Math.abs(sinWave);
+        const name = nameRef.current?.toLowerCase() || '';
         
         // --- PHYSICS & SECONDARY MOTION ---
         const exertion = (Math.sin(time) + 1) * 0.5; // 0 to 1 intensity cycle
 
         // Sweat accumulation logic (Material Physics)
-        skinMat.clearcoat = 0.2 + (exertion * 0.3); // Increased sweat gloss range
-        skinMat.roughness = 0.6 - (exertion * 0.15); 
+        skinMat.clearcoat = 0.15 + (exertion * 0.35); // Sweaty skin simulation
+        skinMat.roughness = 0.55 - (exertion * 0.2); 
         
         // Breathing fill light for lifelike ambience (Lighting Physics)
-        fillLight.intensity = 0.6 + (Math.sin(time * 0.8) * 0.1);
+        fillLight.intensity = 0.7 + (Math.sin(time * 0.8) * 0.1);
         keyLight.position.x = 3 + Math.sin(time * 0.2) * 0.5;
 
         // 1. Respiratory Dynamics (Breathing)
@@ -641,7 +647,6 @@ const ExerciseAnimation: React.FC<Props> = ({ visualTag, exerciseName, descripti
         rArm.shoulder.position.y = 0.11 + (breath * 0.3);
 
         // 2. Natural Noise (Micro-adjustments for balance)
-        // Using sine combination to simulate Perlin-like noise
         const noise = Math.sin(time * 3.7) * Math.sin(time * 1.3) * 0.02;
         spine.rotation.z += noise; 
         headGroup.rotation.z -= noise * 0.8; // Head compensates
@@ -714,39 +719,33 @@ const ExerciseAnimation: React.FC<Props> = ({ visualTag, exerciseName, descripti
         });
 
         const highlightParts = (partNames: string[], engagement: number = 0.5) => {
-            // Smooth easing curve (Cubic Ease In-Out) for natural engagement transition
-            // This prevents linear "robotic" lighting changes
-            const t = engagement < 0.5 
-                ? 4 * engagement * engagement * engagement 
-                : 1 - Math.pow(-2 * engagement + 2, 3) / 2;
+            const t = engagement;
+            if (t < 0.02) return;
 
-            if (t < 0.05) return;
+            const pulseFreq = 1.0 + (t * 3.0); 
+            const phase = time * pulseFreq;
+            const beat = Math.pow(Math.sin(phase), 2);
+            
+            const pulseAmp = 0.1 + (t * 0.4); 
+            const pulse = beat * pulseAmp;
 
-            // Dynamic Pulse (Simulates blood flow/energy)
-            // Frequency scales with effort: 1.5Hz (resting) -> 4.0Hz (max effort)
-            const pulseFreq = 1.5 + (t * 2.5); 
-            // Sine wave normalized 0..1 with a slight time offset for organic feel
-            const sine = (Math.sin(time * pulseFreq - Math.PI/4) + 1) * 0.5;
-            // Pulse magnitude increases with effort
-            const pulse = sine * (0.1 + t * 0.3);
-
-            // Intensity Mapping
-            // Base emission + dynamic effort + pulse
-            const baseIntensity = 0.4;
-            const maxIntensity = 2.5; // Brighter peak for visibility
-            const currentIntensity = baseIntensity + (t * (maxIntensity - baseIntensity)) + pulse;
-
-            const opacity = 0.5 + (t * 0.4); // 0.5 to 0.9
+            const baseIntensity = 0.5 + (t * 2.0); 
+            const finalIntensity = baseIntensity + pulse;
 
             const mat = highlightMat as THREE.MeshPhysicalMaterial;
-            mat.emissiveIntensity = currentIntensity;
-            mat.opacity = opacity;
+            mat.emissiveIntensity = finalIntensity;
             
-            // Dynamic Color Shift (Heatmap style)
-            // Shift from Cool Teal -> Bright Cyan -> Hot White
-            const c1 = new THREE.Color(0x2dd4bf); // Base Teal
-            const c2 = new THREE.Color(0xffffff); // Hot White
-            mat.emissive.lerpColors(c1, c2, t * 0.9); // Don't go fully white to keep some color
+            mat.opacity = 0.3 + (t * 0.5); 
+            
+            const colorStart = new THREE.Color(0x2dd4bf); // Teal
+            const colorMid = new THREE.Color(0x60a5fa);   // Blue-400
+            const colorEnd = new THREE.Color(0xffffff);   // White
+            
+            if (t < 0.5) {
+                mat.emissive.lerpColors(colorStart, colorMid, t * 2);
+            } else {
+                mat.emissive.lerpColors(colorMid, colorEnd, (t - 0.5) * 2);
+            }
 
             partNames.forEach(name => {
                 const mesh = parts[name];
@@ -757,14 +756,12 @@ const ExerciseAnimation: React.FC<Props> = ({ visualTag, exerciseName, descripti
         };
         
         const highlightJoints = (partNames: string[], intensityScalar: number) => {
-            // Subtle sympathetic resonance pulse
             const pulse = (Math.sin(time * 8.0) + 1) * 0.15; 
             const glow = 0.6 + (intensityScalar * 2.0) + pulse;
             
             const mat = jointHighlightMat as THREE.MeshPhysicalMaterial;
             mat.emissiveIntensity = glow;
             
-            // Dynamic Color Shift: Warning Orange -> Alert Red
             const safeColor = new THREE.Color(0xff8800);
             const stressColor = new THREE.Color(0xff0000);
             mat.emissive.lerpColors(safeColor, stressColor, intensityScalar * 0.8);
@@ -794,62 +791,58 @@ const ExerciseAnimation: React.FC<Props> = ({ visualTag, exerciseName, descripti
 
         // 4. Procedural Animations
         switch (visualTag) {
-          case 'standing': // SQUAT
-            pelvis.position.y = 1.0 - (absSin * 0.3);
-            pelvis.rotation.x = -absSin * 0.2;
-            
-            lLeg.hip.rotation.x = -absSin * 1.0;
-            rLeg.hip.rotation.x = -absSin * 1.0;
-            lLeg.knee.rotation.x = absSin * 2.1;
-            rLeg.knee.rotation.x = absSin * 2.1;
-            
-            lLeg.ankle.rotation.x = -lLeg.hip.rotation.x - lLeg.knee.rotation.x - pelvis.rotation.x;
-            rLeg.ankle.rotation.x = -rLeg.hip.rotation.x - rLeg.knee.rotation.x - pelvis.rotation.x;
-
-            // Lag Effect: Arms raise slightly after hips drop
-            lArm.shoulder.rotation.x = -absSinLag * 1.5;
-            rArm.shoulder.rotation.x = -absSinLag * 1.5;
-            spine.position.y = 0.1 - (absSin * 0.01);
-
-             // Physics: Knee wobble at bottom of squat
-            if (absSin > 0.8) {
-                 lLeg.knee.rotation.z = (Math.sin(time * 15) * 0.05);
-                 rLeg.knee.rotation.z = -(Math.sin(time * 15) * 0.05);
-                 // Thigh muscles bulge at max exertion
-                 bulgeMuscle('leftThigh', 0.8);
-                 bulgeMuscle('rightThigh', 0.8);
-            }
-
-            highlightParts(['leftThigh', 'rightThigh', 'hips'], absSin);
-            highlightJoints(['leftKnee', 'rightKnee', 'leftHipJoint', 'rightHipJoint'], absSin);
-            
-            const hipPos = getWorldPos('hips');
-            const floorPos = hipPos.clone().setY(0);
-            updateGuide(0, hipPos, floorPos);
-            break;
+          case 'standing': 
+             // SQUAT vs BALANCE check
+             if (name.includes('squat') || name.includes('chair')) {
+                 pelvis.position.y = 1.0 - (absSin * 0.3);
+                 pelvis.rotation.x = -absSin * 0.2;
+                 lLeg.hip.rotation.x = -absSin * 1.0; rLeg.hip.rotation.x = -absSin * 1.0;
+                 lLeg.knee.rotation.x = absSin * 2.1; rLeg.knee.rotation.x = absSin * 2.1;
+                 lLeg.ankle.rotation.x = -lLeg.hip.rotation.x - lLeg.knee.rotation.x - pelvis.rotation.x;
+                 rLeg.ankle.rotation.x = -rLeg.hip.rotation.x - rLeg.knee.rotation.x - pelvis.rotation.x;
+                 lArm.shoulder.rotation.x = -absSinLag * 1.5; rArm.shoulder.rotation.x = -absSinLag * 1.5;
+                 highlightParts(['leftThigh', 'rightThigh', 'hips'], absSin);
+             } else {
+                 // BALANCE / STANDING
+                 pelvis.position.x = Math.sin(time * 0.5) * 0.1; // Gentle sway
+                 spine.rotation.z = -Math.sin(time * 0.5) * 0.05;
+                 // Lift one leg slightly for balance check if name implies
+                 if (name.includes('one') || name.includes('balance')) {
+                     rLeg.hip.rotation.x = -0.4;
+                     rLeg.knee.rotation.x = 0.8;
+                     rArm.shoulder.rotation.z = -0.5; // Balance arm out
+                     highlightParts(['leftThigh', 'leftShin', 'abs'], 0.7);
+                 } else {
+                     highlightParts(['abs', 'hips'], 0.3);
+                 }
+             }
+             break;
   
-          case 'lying_back': // CRUNCH
-            mannequin.rotation.x = -Math.PI / 2;
-            mannequin.position.y = 0.15;
-            
-            lLeg.hip.rotation.x = -1.5;
-            rLeg.hip.rotation.x = -1.5;
-            lLeg.knee.rotation.x = 1.6;
-            rLeg.knee.rotation.x = 1.6;
-            
-            const crunch = Math.max(0, sinWave);
-            spine.rotation.x = crunch * 0.6;
-            // Neck follows with lag
-            neckGroup.rotation.x = Math.max(0, sinLag) * 0.3;
+          case 'lying_back': 
+             mannequin.rotation.x = -Math.PI / 2;
+             mannequin.position.y = 0.15;
+             lLeg.hip.rotation.x = -1.5; rLeg.hip.rotation.x = -1.5;
+             lLeg.knee.rotation.x = 1.6; rLeg.knee.rotation.x = 1.6;
 
-            // Effort shake
-            if (crunch > 0.5) {
-                spine.rotation.y += tremor;
-            }
-
-            highlightParts(['abs'], crunch);
-            highlightJoints(['neck'], crunch);
-            break;
+             if (name.includes('slide') || name.includes('tap')) {
+                 // HEEL SLIDES / TOE TAPS
+                 const slide = (Math.sin(time) + 1) * 0.5;
+                 lLeg.knee.rotation.x = 1.6 - (slide * 1.0); // Straighten leg
+                 lLeg.hip.rotation.x = -1.5 + (slide * 0.5); // Lower hip
+                 highlightParts(['abs', 'leftThigh'], slide);
+             } else if (name.includes('breath') || name.includes('connect')) {
+                 // DEEP BREATHING
+                 const deepBreath = (Math.sin(time) + 1) * 0.5;
+                 chestGroup.scale.set(1 + deepBreath * 0.1, 1 + deepBreath * 0.1, 1 + deepBreath * 0.15);
+                 highlightParts(['abs', 'chest'], deepBreath);
+             } else {
+                 // CRUNCH (Default)
+                 const crunch = Math.max(0, sinWave);
+                 spine.rotation.x = crunch * 0.6;
+                 neckGroup.rotation.x = Math.max(0, sinLag) * 0.3;
+                 highlightParts(['abs'], crunch);
+             }
+             break;
 
           case 'glute_bridge': 
             mannequin.rotation.x = -Math.PI / 2;
@@ -997,21 +990,26 @@ const ExerciseAnimation: React.FC<Props> = ({ visualTag, exerciseName, descripti
             lLeg.hip.rotation.x = -1.2; lLeg.hip.rotation.z = -0.5; lLeg.knee.rotation.x = 2.0;
             rLeg.hip.rotation.x = -1.2; rLeg.hip.rotation.z = 0.5; rLeg.knee.rotation.x = 2.0;
 
-            const deepBreath = 1 + (sinWave * 0.08);
             const breathEffort = (sinWave + 1) * 0.5; 
-            
-            chestGroup.scale.set(deepBreath, deepBreath, deepBreath); 
-            lArm.shoulder.position.y = 0.11 + (sinWave * 0.01);
-            rArm.shoulder.position.y = 0.11 + (sinWave * 0.01);
-
-            lArm.shoulder.rotation.z = 0.5; rArm.shoulder.rotation.z = -0.5;
-            lArm.elbow.rotation.x = -0.5; rArm.elbow.rotation.x = -0.5;
             
             // Meditative sway
             spine.rotation.x = Math.sin(time * 0.5) * 0.05;
-            spine.rotation.z += noise; // Seated balance
+            spine.rotation.z += noise; 
             
-            highlightParts(['chest', 'abs'], breathEffort);
+            if (name.includes('kegel')) {
+                 // Subtle internal lift visualization
+                 highlightParts(['hips', 'abs'], 0.3 + (breathEffort * 0.3));
+                 lArm.shoulder.rotation.z = 0.2; rArm.shoulder.rotation.z = -0.2;
+            } else {
+                // Default Breathing
+                const dBreath = 1 + (sinWave * 0.08);
+                chestGroup.scale.set(dBreath, dBreath, dBreath); 
+                lArm.shoulder.position.y = 0.11 + (sinWave * 0.01);
+                rArm.shoulder.position.y = 0.11 + (sinWave * 0.01);
+                lArm.shoulder.rotation.z = 0.5; rArm.shoulder.rotation.z = -0.5;
+                lArm.elbow.rotation.x = -0.5; rArm.elbow.rotation.x = -0.5;
+                highlightParts(['chest', 'abs'], breathEffort);
+            }
             highlightJoints(['leftHipJoint', 'rightHipJoint'], 0.3);
             break;
   
@@ -1041,7 +1039,7 @@ const ExerciseAnimation: React.FC<Props> = ({ visualTag, exerciseName, descripti
       rendererRef.current?.dispose();
       rendererRef.current = null;
     };
-  }, [visualTag, showGuides]);
+  }, [visualTag, showGuides, exerciseName]);
 
   return (
     <div className="relative w-full h-full group bg-slate-900 rounded-lg overflow-hidden">

@@ -8,7 +8,54 @@ import { loadState, toggleExerciseCompletion, calculateStreak, getTodayDate } fr
 
 interface Props {
   plan: RecoveryPlan;
+  logs: Record<string, string[]>;
+  onToggleExercise: (name: string) => void;
 }
+
+// --- SUB-COMPONENT: WEEKLY TRACKER ---
+const WeeklyTracker: React.FC<{ logs: Record<string, string[]> }> = ({ logs }) => {
+  // Generate last 7 days based on Local Time
+  const days = Array.from({ length: 7 }).map((_, i) => {
+    const d = new Date();
+    const offset = d.getTimezoneOffset();
+    const localToday = new Date(d.getTime() - (offset * 60 * 1000));
+    
+    // Calculate date backwards from today (i=6 is today, i=0 is 6 days ago)
+    localToday.setDate(localToday.getDate() - (6 - i));
+    const dateStr = localToday.toISOString().split('T')[0];
+    
+    return {
+      date: dateStr,
+      dayLabel: localToday.toLocaleDateString('en-US', { weekday: 'narrow' }), // M, T, W...
+      hasLog: logs[dateStr] && logs[dateStr].length > 0,
+      isToday: i === 6
+    };
+  });
+
+  return (
+    <div className="flex items-center justify-between gap-2 mt-6 bg-black/20 p-4 rounded-xl backdrop-blur-sm border border-white/5">
+      {days.map((day) => (
+        <div key={day.date} className="flex flex-col items-center gap-2 group cursor-default" title={day.date}>
+           <span className={`text-[10px] font-bold uppercase transition-colors ${day.isToday ? 'text-white' : 'text-white/60'}`}>{day.dayLabel}</span>
+           <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
+             day.hasLog 
+               ? 'bg-green-400 border-green-400 text-stone-900 shadow-[0_0_10px_rgba(74,222,128,0.3)] scale-100' 
+               : day.isToday 
+                 ? 'border-white/40 bg-white/10 text-transparent scale-105'
+                 : 'border-white/10 text-transparent'
+           }`}>
+              {day.hasLog && <Check size={16} strokeWidth={4} />}
+           </div>
+        </div>
+      ))}
+      <div className="hidden sm:block h-8 w-px bg-white/10 mx-2"></div>
+      <div className="hidden sm:flex flex-col justify-center">
+          <span className="text-[10px] text-white/60 uppercase font-bold tracking-wider">Consistency</span>
+          <span className="text-xs text-white font-medium">Keep it up!</span>
+      </div>
+    </div>
+  );
+};
 
 const ExerciseCard: React.FC<{ 
   exercise: Exercise; 
@@ -23,7 +70,7 @@ const ExerciseCard: React.FC<{
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [selectedVoice, setSelectedVoice] = useState<SpeechSynthesisVoice | null>(null);
-  const [showVoiceSettings, setShowVoiceSettings] = useState(false);
+  const [isAvoidExpanded, setIsAvoidExpanded] = useState(false);
 
   useEffect(() => {
     const loadVoices = () => {
@@ -88,14 +135,18 @@ const ExerciseCard: React.FC<{
     window.speechSynthesis.speak(utterance);
   };
 
+  const avoidText = exercise.whenToAvoid || "";
+  const TRUNCATE_LENGTH = 50;
+  const shouldTruncate = avoidText.length > TRUNCATE_LENGTH;
+
   return (
     <>
-      <div className={`bg-white dark:bg-stone-900 rounded-xl border transition-all duration-300 overflow-hidden flex flex-col h-full group ${isCompleted ? 'border-green-400 dark:border-green-800 shadow-sm opacity-90' : 'border-stone-200 dark:border-stone-800 shadow-sm hover:shadow-md'}`}>
+      <div className={`bg-white dark:bg-stone-900 rounded-xl border transition-all duration-300 overflow-hidden flex flex-col h-full group ${isCompleted ? 'border-green-500 bg-green-50/50 dark:bg-green-900/10 shadow-md ring-1 ring-green-200 dark:ring-green-900' : 'border-stone-200 dark:border-stone-800 shadow-sm hover:shadow-md'}`}>
         <div className="p-5 flex-grow relative">
           {/* Complete Button Overlay */}
           <button 
             onClick={onToggle}
-            className={`absolute top-4 right-4 z-10 p-2 rounded-full transition-all ${isCompleted ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' : 'bg-stone-100 text-stone-300 hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-600 dark:hover:text-stone-400'}`}
+            className={`absolute top-4 right-4 z-10 p-2 rounded-full transition-all ${isCompleted ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400 scale-110 shadow-sm' : 'bg-stone-100 text-stone-300 hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-600 dark:hover:text-stone-400'}`}
             title={isCompleted ? "Mark Incomplete" : "Mark Complete"}
           >
             <CheckCircle size={24} fill={isCompleted ? "currentColor" : "none"} />
@@ -103,7 +154,9 @@ const ExerciseCard: React.FC<{
 
           <div className="flex flex-col gap-3 mb-4 pr-10">
              <div className="flex justify-between items-start">
-                 <h3 className={`font-bold text-lg leading-tight ${isCompleted ? 'text-stone-500 line-through decoration-stone-400' : 'text-stone-800 dark:text-stone-100'}`}>{exercise.name}</h3>
+                 <h3 className={`font-bold text-lg leading-tight transition-all ${isCompleted ? 'text-green-800 dark:text-green-300 decoration-green-500/30' : 'text-stone-800 dark:text-stone-100'}`}>
+                   {exercise.name} {isCompleted && <span className="text-xs font-normal text-green-600 ml-1">(Done)</span>}
+                 </h3>
              </div>
              <span className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400 bg-stone-100 dark:bg-stone-800 px-2 py-1 rounded-md border border-stone-200 dark:border-stone-700 w-fit">
                 {exercise.visualTag.replace('_', ' ')}
@@ -149,7 +202,23 @@ const ExerciseCard: React.FC<{
                <div className="flex items-center gap-1.5 text-xs font-bold text-amber-600 dark:text-amber-500 mb-1 uppercase">
                  <AlertOctagon size={12} /> Avoid If
                </div>
-               <p className="text-xs font-medium text-amber-800 dark:text-amber-300 leading-tight">{exercise.whenToAvoid}</p>
+               <p className="text-xs font-medium text-amber-800 dark:text-amber-300 leading-tight">
+                 {shouldTruncate && !isAvoidExpanded 
+                   ? `${avoidText.substring(0, TRUNCATE_LENGTH)}...` 
+                   : avoidText}
+                 
+                 {shouldTruncate && (
+                   <button 
+                     onClick={(e) => {
+                       e.stopPropagation();
+                       setIsAvoidExpanded(!isAvoidExpanded);
+                     }}
+                     className="ml-1 font-bold underline decoration-amber-500/50 hover:decoration-amber-500 cursor-pointer focus:outline-none"
+                   >
+                     {isAvoidExpanded ? "less" : "more"}
+                   </button>
+                 )}
+               </p>
             </div>
           </div>
         </div>
@@ -280,17 +349,12 @@ const PhaseCard: React.FC<{
   );
 };
 
-const RecoveryPlanView: React.FC<Props> = ({ plan }) => {
+const RecoveryPlanView: React.FC<Props> = ({ plan, logs, onToggleExercise }) => {
   const [openPhase, setOpenPhase] = useState<number>(0);
-  const [state, setState] = useState(loadState());
+  // Lifted state: logs are now passed in props
   const today = getTodayDate();
-  const todaysLogs = state.logs[today] || [];
-  const streak = calculateStreak(state.logs);
-
-  const handleToggleExercise = (name: string) => {
-    toggleExerciseCompletion(name);
-    setState(loadState());
-  };
+  const todaysLogs = logs[today] || [];
+  const streak = calculateStreak(logs);
 
   return (
     <div className="max-w-6xl mx-auto pb-12 animate-fade-in-up">
@@ -300,6 +364,9 @@ const RecoveryPlanView: React.FC<Props> = ({ plan }) => {
            <div className="md:col-span-2">
              <h1 className="text-2xl md:text-3xl font-bold mb-2">Welcome Back, Mama</h1>
              <p className="text-stone-300 leading-relaxed text-sm md:text-base opacity-90">{plan.summary}</p>
+             
+             {/* Integrated Weekly Progress */}
+             <WeeklyTracker logs={logs} />
            </div>
            
            <div className="flex gap-4 md:justify-end items-start">
@@ -331,7 +398,7 @@ const RecoveryPlanView: React.FC<Props> = ({ plan }) => {
               isOpen={openPhase === idx} 
               toggle={() => setOpenPhase(openPhase === idx ? -1 : idx)}
               logs={todaysLogs}
-              onToggleExercise={handleToggleExercise}
+              onToggleExercise={onToggleExercise}
             />
           ))}
         </div>

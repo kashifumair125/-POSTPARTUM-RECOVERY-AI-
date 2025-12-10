@@ -1,22 +1,34 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AssessmentForm } from './components/AssessmentForm';
 import RecoveryPlanView from './components/RecoveryPlanView';
 import HealthChat from './components/HealthChat';
+import { PrivacyModal } from './components/PrivacyModal';
+import { AboutModal } from './components/AboutModal';
+import { FeedbackModal } from './components/FeedbackModal';
+import { AuthModal } from './components/AuthModal';
 import { generateRecoveryRoadmap } from './services/geminiService';
-import { loadState, saveState, clearState } from './services/storageService';
+import { loadState, saveState, clearState, toggleExerciseCompletion } from './services/storageService';
+import { supabase, saveCloudData, loadCloudData } from './services/supabaseClient';
 import { RecoveryPlan, AppState, ChatMessage } from './types';
-import { Loader2, Sparkles, AlertTriangle, RefreshCw, Moon, Sun, Heart, Shield, Mail, Info, CheckCircle, Bell } from 'lucide-react';
+import { Loader2, Sparkles, AlertTriangle, RefreshCw, Moon, Sun, Heart, Shield, Bell, MessageSquare, User, LogOut, Cloud, ChevronDown, CheckCircle } from 'lucide-react';
 
 export default function App() {
   const [appState, setAppState] = useState<AppState>(loadState());
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [user, setUser] = useState<any>(null);
   
   // Modal States
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
   const [showTerms, setShowTerms] = useState(!loadState().hasAgreedToTerms);
+  const [syncing, setSyncing] = useState(false);
+  
+  const isHydratingRef = useRef(false);
 
+  // Initialize Theme
   useEffect(() => {
     if (appState.settings.theme === 'dark') {
       document.documentElement.classList.add('dark');
@@ -24,6 +36,83 @@ export default function App() {
       document.documentElement.classList.remove('dark');
     }
   }, [appState.settings.theme]);
+
+  // Initialize Auth & Cloud Sync
+  useEffect(() => {
+    if (!supabase) return;
+
+    // Check active session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        handleCloudSync(session.user.id);
+      }
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const prevUser = user;
+      const newUser = session?.user ?? null;
+      setUser(newUser);
+      
+      // If user just logged in (and wasn't logged in before)
+      if (newUser && !prevUser) {
+        handleCloudSync(newUser.id);
+        setShowAuth(false); // Close auth modal immediately on login
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Auto-Save to Cloud on AppState Change (Debounced)
+  useEffect(() => {
+    if (!user || !supabase || isHydratingRef.current) return;
+
+    const timeoutId = setTimeout(() => {
+      setSyncing(true);
+      saveCloudData(user.id, appState).then(() => setSyncing(false));
+    }, 2000); // Debounce saves by 2 seconds
+
+    return () => clearTimeout(timeoutId);
+  }, [appState, user]);
+
+  const handleCloudSync = async (userId: string) => {
+    setSyncing(true);
+    isHydratingRef.current = true;
+    try {
+      const cloudData = await loadCloudData(userId);
+      if (cloudData) {
+        // Merge strategy: Cloud usually wins if it exists, or prompt user.
+        // For simplicity, we'll assume cloud data is the source of truth if it exists,
+        // but we preserve local settings if cloud settings are missing.
+        const mergedState = { ...cloudData, settings: { ...appState.settings, ...cloudData.settings } };
+        setAppState(mergedState);
+        saveState(mergedState); // Update local storage too
+      } else {
+        // No cloud data, push local data to cloud
+        await saveCloudData(userId, appState);
+      }
+    } catch (e) {
+      console.error("Sync error", e);
+    } finally {
+      setSyncing(false);
+      // Allow some time for state to settle before enabling auto-save again
+      setTimeout(() => {
+        isHydratingRef.current = false;
+      }, 1000);
+    }
+  };
+
+  const handleLogout = async () => {
+    if (supabase) {
+      await supabase.auth.signOut();
+      setUser(null);
+      // Optional: Clear local state on logout? 
+      // For now, we keep it to allow offline usage, but you might want to clear sensitive data.
+      // clearState(); 
+    }
+  };
 
   const toggleTheme = () => {
     const newTheme: 'light' | 'dark' = appState.settings.theme === 'light' ? 'dark' : 'light';
@@ -87,6 +176,11 @@ export default function App() {
     setShowTerms(false);
   };
 
+  const handleToggleLog = (exerciseName: string) => {
+    const newLogs = toggleExerciseCompletion(exerciseName);
+    setAppState(prev => ({ ...prev, logs: newLogs }));
+  };
+
   const enableNotifications = async () => {
     if (!("Notification" in window)) {
       alert("This browser does not support desktop notifications");
@@ -124,12 +218,19 @@ export default function App() {
             </h1>
           </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 md:gap-4">
+             {syncing && (
+               <div className="hidden md:flex items-center gap-1 text-xs text-stone-500 animate-pulse">
+                 <Cloud size={14} /> Saving...
+               </div>
+             )}
+             
              {appState.plan && (
                <button onClick={clearState} className={`hidden md:flex text-sm font-medium transition-colors items-center gap-1 ${appState.settings.theme === 'dark' ? 'text-stone-400 hover:text-rose-400' : 'text-stone-500 hover:text-rose-600'}`}>
                  <RefreshCw size={14} /> Reset
                </button>
              )}
+             
              <button 
                onClick={toggleTheme}
                className={`p-2 rounded-full transition-colors ${appState.settings.theme === 'dark' ? 'bg-stone-800 text-yellow-400 hover:bg-stone-700' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}
@@ -137,6 +238,29 @@ export default function App() {
              >
                {appState.settings.theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
              </button>
+
+             {user ? (
+               <div className="flex items-center gap-2">
+                 <div className="hidden sm:flex flex-col items-end mr-1">
+                    <span className="text-[10px] uppercase font-bold text-stone-400">Logged in as</span>
+                    <span className="text-xs font-semibold max-w-[100px] truncate text-stone-700 dark:text-stone-200">{user.email?.split('@')[0]}</span>
+                 </div>
+                 <button 
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-stone-100 dark:bg-stone-800 text-xs font-bold text-stone-600 dark:text-stone-300 border border-stone-200 dark:border-stone-700 hover:bg-stone-200 dark:hover:bg-stone-700 transition-colors"
+                  title="Sign Out"
+                 >
+                   <LogOut size={14} />
+                 </button>
+               </div>
+             ) : (
+               <button 
+                onClick={() => setShowAuth(true)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-rose-100 dark:bg-rose-900/30 text-xs font-bold text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 hover:bg-rose-200 dark:hover:bg-rose-900/50 transition-colors"
+               >
+                 <User size={14} /> <span className="hidden sm:inline">Sign In</span>
+               </button>
+             )}
           </div>
         </div>
       </header>
@@ -203,7 +327,11 @@ export default function App() {
             </div>
           </div>
         ) : (
-          <RecoveryPlanView plan={appState.plan} />
+          <RecoveryPlanView 
+            plan={appState.plan} 
+            logs={appState.logs} 
+            onToggleExercise={handleToggleLog} 
+          />
         )}
       </main>
 
@@ -230,9 +358,9 @@ export default function App() {
                 <button onClick={enableNotifications} className={`flex items-center gap-1 ${appState.settings.theme === 'dark' ? 'text-stone-400 hover:text-rose-400' : 'text-stone-500 hover:text-rose-600'}`}>
                    <Bell size={14} /> {appState.settings.remindersEnabled ? 'Reminders On' : 'Enable Reminders'}
                 </button>
-                <a href="mailto:kashifumair125@gmail.com" className={`flex items-center gap-1 ${appState.settings.theme === 'dark' ? 'text-stone-400 hover:text-rose-400' : 'text-stone-500 hover:text-rose-600'}`}>
-                   <Mail size={14} /> Contact
-                </a>
+                <button onClick={() => setShowFeedback(true)} className={`flex items-center gap-1 ${appState.settings.theme === 'dark' ? 'text-stone-400 hover:text-rose-400' : 'text-stone-500 hover:text-rose-600'}`}>
+                   <MessageSquare size={14} /> Feedback
+                </button>
              </div>
           </div>
           
@@ -278,56 +406,16 @@ export default function App() {
       )}
 
       {/* PRIVACY MODAL */}
-      {showPrivacy && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-           <div className={`w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto ${appState.settings.theme === 'dark' ? 'bg-stone-900 text-stone-100' : 'bg-white text-stone-800'}`}>
-              <div className="p-6 border-b border-stone-100 dark:border-stone-800 flex justify-between items-center">
-                 <h2 className="text-xl font-bold flex items-center gap-2"><Shield className="text-rose-500" /> Privacy Policy</h2>
-                 <button onClick={() => setShowPrivacy(false)} className="opacity-50 hover:opacity-100">Close</button>
-              </div>
-              <div className="p-6 space-y-4 text-sm leading-relaxed opacity-90">
-                 <p><strong>Effective Date:</strong> October 2024</p>
-                 <p>Your privacy is paramount. We follow a <strong>Local-First</strong> data policy:</p>
-                 <ul className="list-disc pl-5 space-y-2">
-                   <li><strong>Data Storage:</strong> Your recovery plan, progress logs, and profile are stored <strong>only on this device</strong> using your browser's Local Storage. We do not have a central database of your health info.</li>
-                   <li><strong>Image Processing:</strong> Photos uploaded for Diastasis checks are sent to the AI for analysis and <strong>immediately discarded</strong>. They are not stored.</li>
-                   <li><strong>Cookies:</strong> We use local storage for functionality (saving your plan) only.</li>
-                 </ul>
-                 <p className="mt-4">For questions, contact <a href="mailto:kashifumair125@gmail.com" className="text-rose-500 hover:underline">kashifumair125@gmail.com</a>.</p>
-              </div>
-           </div>
-        </div>
-      )}
+      {showPrivacy && <PrivacyModal onClose={() => setShowPrivacy(false)} />}
 
       {/* ABOUT MODAL */}
-      {showAbout && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-           <div className={`w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto ${appState.settings.theme === 'dark' ? 'bg-stone-900 text-stone-100' : 'bg-white text-stone-800'}`}>
-              <div className="p-6 border-b border-stone-100 dark:border-stone-800 flex justify-between items-center">
-                 <h2 className="text-xl font-bold flex items-center gap-2"><Info className="text-rose-500" /> About PostpartumAI</h2>
-                 <button onClick={() => setShowAbout(false)} className="opacity-50 hover:opacity-100">Close</button>
-              </div>
-              <div className="p-6 space-y-4 text-sm leading-relaxed opacity-90">
-                 <p>PostpartumAI was built to bridge the gap in women's healthcare. Too often, new mothers are sent home with a baby and told to "wait 6 weeks" before exercising, with little guidance on <em>how</em> to recover safely.</p>
-                 <p><strong>Our Mission:</strong> To provide accessible, judgment-free, and scientifically grounded recovery roadmaps for every mother.</p>
-                 <h3 className="font-bold text-lg mt-4">Key Features</h3>
-                 <ul className="list-disc pl-5 space-y-1">
-                   <li><strong>Local Persistence:</strong> Your plan saves automatically to your device.</li>
-                   <li><strong>Progress Tracking:</strong> Track your streaks and completed exercises.</li>
-                   <li><strong>Offline Capable:</strong> Install this app to your home screen.</li>
-                 </ul>
-                 <div className="bg-rose-50 dark:bg-rose-900/20 p-4 rounded-xl mt-6">
-                    <p className="font-medium text-center">Built with love and code.</p>
-                    <div className="text-center mt-2">
-                       <a href="mailto:kashifumair125@gmail.com" className="inline-flex items-center gap-2 px-4 py-2 bg-rose-500 text-white rounded-lg hover:bg-rose-600 transition-colors">
-                          <Mail size={16} /> Send Feedback to Developer
-                       </a>
-                    </div>
-                 </div>
-              </div>
-           </div>
-        </div>
-      )}
+      {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
+
+      {/* FEEDBACK MODAL */}
+      {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
+
+      {/* AUTH MODAL */}
+      {showAuth && <AuthModal onClose={() => setShowAuth(false)} onLoginSuccess={() => setShowAuth(false)} />}
 
     </div>
   );

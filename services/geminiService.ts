@@ -32,13 +32,13 @@ export const analyzeDiastasisImage = async (file: File, weeksPostpartum: number)
   return JSON.parse(response.text!);
 };
 
-// --- 2. Generate Recovery Roadmap (Optimized for Speed) ---
+// --- 2. Generate Recovery Roadmap (Optimized for Variety) ---
 export const generateRecoveryRoadmap = async (profile: any): Promise<RecoveryPlan> => {
   const culturalPrompt = profile.culturalContext
     ? `Include culturally sensitive advice relevant to South Asian and Middle Eastern women (e.g., confinement diet, wrapping, rest) aligned with medical safety.`
     : "";
 
-  const prompt = `Create a PERSONALIZED 12-WEEK postpartum recovery roadmap.
+  const prompt = `Create a highly PERSONALIZED 12-WEEK postpartum recovery roadmap.
   
   USER PROFILE:
   - Delivery: ${profile.deliveryMethod}
@@ -53,15 +53,27 @@ export const generateRecoveryRoadmap = async (profile: any): Promise<RecoveryPla
 
   REQUIREMENTS:
   1. Summary: Warm, encouraging, feminine tone.
-  2. Phases: 3 Phases (Reconnect, Stability, Strength).
-  3. Exercises: 3-4 per phase. 
+  2. Phases: 3 Distinct Phases.
+     - Phase 1 (Weeks 1-4): Reconnection & Restore. Focus on breath, pelvic floor, and gentle support.
+     - Phase 2 (Weeks 5-8): Stability & Control. Focus on deep core, balance, and coordination.
+     - Phase 3 (Weeks 9-12): Functional Strength. Focus on standing movements, glutes, and total body integration.
+
+  3. Exercise Selection Rules (CRITICAL for Diversity):
+     - **NO REPETITION**: An exercise name used in one phase MUST NOT appear in any other phase.
+     - **VISUAL VARIETY**: Use different visualTags for different phases.
+       - *Phase 1*: Focus on 'lying_back' (use names like "Heel Slides", "Deep Breathing"), 'seated', 'glute_bridge'.
+       - *Phase 2*: Focus on 'all_fours', 'bird_dog', 'lying_back' (use names like "Deadbug", "Toe Taps").
+       - *Phase 3*: Focus on 'standing' (use names like "Squats", "Balance"), 'lunge', 'plank', 'side_plank'.
+     - **NAMING MATTERS**: The visualizer adapts to the name. 
+       - Use "Heel Slides" or "Breathing" for gentle lying exercises.
+       - Use "Deadbug" or "Crunch" for active lying exercises.
+       - Use "Squat" vs "Stand" for standing exercises.
+
+  4. Data Fields:
      - CRITICAL: Provide detailed "howTo" steps (array of strings).
      - CRITICAL: Include a "benefits" field. Explain WHY this specific exercise helps a postpartum body.
      - Provide "whenToAvoid" specific to this user's symptoms.
-     - DIVERSITY REQUIRED: Mix of positions (supine, seated, standing, all-fours).
-     - NO REPETITION: Do NOT repeat the exact same exercise name across phases.
-     - Choose a "visualTag" from: ['lying_back', 'all_fours', 'standing', 'seated', 'plank', 'glute_bridge', 'bird_dog', 'side_plank', 'lunge'].
-     - Select the visualTag that best fits the movement pattern.
+     - Choose a "visualTag" STRICTLY from: ['lying_back', 'all_fours', 'standing', 'seated', 'plank', 'glute_bridge', 'bird_dog', 'side_plank', 'lunge'].
   
   Return JSON only.`;
 
@@ -110,7 +122,7 @@ export const generateRecoveryRoadmap = async (profile: any): Promise<RecoveryPla
   };
 
   try {
-    // Use FLASH model for speed (User request: "make it fast")
+    // Using FLASH for speed, but prompt is heavily engineered for variety.
     const response = await ai.models.generateContent({
       model: FAST_MODEL, 
       contents: { parts: [{ text: prompt }] },
