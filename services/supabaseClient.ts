@@ -1,14 +1,15 @@
+
 import { createClient } from '@supabase/supabase-js';
 import { AppState } from '../types';
 
-// Configured with provided credentials.
-// We keep process.env as a priority for security in different environments,
-// but fall back to the provided keys for immediate functionality.
-const supabaseUrl = process.env.SUPABASE_URL || 'https://hxdoeaocfssoktyphnsn.supabase.co';
-const supabaseKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh4ZG9lYW9jZnNzb2t0eXBobnNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUzNDM3MDksImV4cCI6MjA4MDkxOTcwOX0.8o20K2mdNiS-4Kv23zIEAtPAUGXnxPPQ9i5N8eCTZDc';
+// For production, these MUST be set in your deployment platform (Vercel, Netlify, etc.)
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_ANON_KEY;
 
+// Cast to 'any' to bypass TypeScript errors where v1 types (SupabaseAuthClient) 
+// conflict with v2 method usage (getSession, signInWithPassword, etc.)
 export const supabase = (supabaseUrl && supabaseKey) 
-  ? createClient(supabaseUrl, supabaseKey) 
+  ? createClient(supabaseUrl, supabaseKey) as any
   : null;
 
 // Table schema assumption:

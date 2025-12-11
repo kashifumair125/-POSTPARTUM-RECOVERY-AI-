@@ -192,6 +192,7 @@ export const updateAnimationFrame = (
   });
   
   // Reset all scale (Critical for bulging effect to not accumulate)
+  // This resets the *animation* scaling, but preserves the geometry size which handles body type.
   Object.values(rig.parts).forEach(part => part.scale.set(1, 1, 1));
 
   // Default Arms (A-Pose relaxed)
@@ -227,20 +228,22 @@ export const updateAnimationFrame = (
   const rawBreath = (Math.sin(breathTime * breathFreq) + 1) * 0.5;
   const breathVal = rawBreath * breathAmp;
   
-  // Chest Expansion
+  // Chest Expansion (Scaling relative to initial size)
+  // We use additive scaling so it works on top of body type geometry
   rig.chest.scale.set(
-    1 + breathVal * 0.4, 
-    1 + breathVal * 0.15, 
-    1 + breathVal * 0.8
+    1 + breathVal * 0.6, 
+    1 + breathVal * 0.2, 
+    1 + breathVal * 0.9
   );
 
   // Belly Breathing (Diaphragmatic)
   if (rig.parts['abs']) {
-      const bellyScale = breathVal * 1.5;
+      // Abs inflate more significantly during rest, tighten during exertion
+      const bellyScale = breathVal * (1.5 - (exertion * 0.5));
       rig.parts['abs'].scale.set(
-          1 + bellyScale * 0.2, 
+          1 + bellyScale * 0.3, 
           1, 
-          1 + bellyScale 
+          1 + bellyScale * 1.2
       );
   }
 
@@ -305,7 +308,7 @@ export const updateAnimationFrame = (
            const effort = (depth - 0.4) * 1.5;
            bulgeMuscle(rig, 'leftThigh', effort);
            bulgeMuscle(rig, 'rightThigh', effort);
-           // Engage core at bottom of squat
+           // Engage core at bottom
            tensenCore(rig, effort * 0.6);
         }
 

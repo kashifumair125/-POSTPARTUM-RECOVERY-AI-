@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 // @ts-ignore
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { Play, Pause, RotateCcw, Loader2, AlertTriangle, Move3d, Layers, Eye } from 'lucide-react';
+import { Play, Pause, RotateCcw, Loader2, AlertTriangle, Move3d, Layers, Eye, User, Palette } from 'lucide-react';
 import { BodyRig, updateAnimationFrame, MaterialSet, calculateExertion } from '../services/animationEngine';
 
 interface Props {
@@ -11,6 +11,31 @@ interface Props {
   exerciseName?: string;
   description?: string;
 }
+
+// Body Configuration Types
+interface BodyProfile {
+  id: string;
+  label: string;
+  hipScale: number;
+  waistScale: number;
+  chestScale: number;
+  limbThickness: number;
+  shoulderWidth: number;
+}
+
+const BODY_PROFILES: BodyProfile[] = [
+  { id: 'standard', label: 'Standard', hipScale: 1.0, waistScale: 1.0, chestScale: 1.0, limbThickness: 1.0, shoulderWidth: 1.0 },
+  { id: 'postpartum', label: 'Soft / Curvy', hipScale: 1.25, waistScale: 1.15, chestScale: 1.1, limbThickness: 1.1, shoulderWidth: 1.0 },
+  { id: 'athletic', label: 'Athletic', hipScale: 0.95, waistScale: 0.95, chestScale: 1.1, limbThickness: 1.25, shoulderWidth: 1.2 }
+];
+
+const SKIN_TONES = [
+  '#ffdbac', // Light
+  '#e0ac69', // Medium
+  '#8d5524', // Dark
+  '#c68642', // Tan
+  '#3c2e28'  // Deep
+];
 
 const ExerciseAnimation: React.FC<Props> = ({ visualTag, exerciseName, description }) => {
   const mountRef = useRef<HTMLDivElement>(null);
@@ -36,6 +61,10 @@ const ExerciseAnimation: React.FC<Props> = ({ visualTag, exerciseName, descripti
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [showGuides, setShowGuides] = useState(true);
+  
+  // Customization State
+  const [bodyProfileIndex, setBodyProfileIndex] = useState(0);
+  const [skinToneIndex, setSkinToneIndex] = useState(0);
 
   const togglePlay = () => {
     const newState = !isPlaying;
@@ -47,6 +76,14 @@ const ExerciseAnimation: React.FC<Props> = ({ visualTag, exerciseName, descripti
     const newSpeed = speed === 1 ? 0.5 : speed === 0.5 ? 2 : 1;
     setSpeed(newSpeed);
     speedRef.current = newSpeed;
+  };
+
+  const cycleBodyProfile = () => {
+    setBodyProfileIndex((prev) => (prev + 1) % BODY_PROFILES.length);
+  };
+
+  const cycleSkinTone = () => {
+    setSkinToneIndex((prev) => (prev + 1) % SKIN_TONES.length);
   };
   
   const handleScrubStart = () => { isScrubbingRef.current = true; };
@@ -71,7 +108,7 @@ const ExerciseAnimation: React.FC<Props> = ({ visualTag, exerciseName, descripti
   };
 
   // Enhanced Procedural Texture Generator
-  const createTexture = (type: 'skin' | 'fabric', mode: 'color' | 'bump' = 'bump') => {
+  const createTexture = (type: 'skin' | 'fabric', mode: 'color' | 'bump' = 'bump', baseColorHex?: string) => {
     if (typeof document === 'undefined') return null;
     const size = 1024; // High res for detail
     const canvas = document.createElement('canvas');
@@ -83,30 +120,30 @@ const ExerciseAnimation: React.FC<Props> = ({ visualTag, exerciseName, descripti
     // Base Layer
     if (type === 'skin') {
        if (mode === 'color') {
-           // Warm skin base
-           ctx.fillStyle = '#ffdbac';
+           const baseColor = baseColorHex || '#ffdbac';
+           ctx.fillStyle = baseColor;
            ctx.fillRect(0, 0, size, size);
 
-           // Add subtle radial gradient for depth (fake subsurface scattering/warmth)
+           // Add subtle radial gradient for depth
            const gradient = ctx.createRadialGradient(size/2, size/2, size/4, size/2, size/2, size);
-           gradient.addColorStop(0, 'rgba(255, 230, 210, 0.1)'); // Highlighting center
-           gradient.addColorStop(1, 'rgba(200, 140, 130, 0.2)'); // Darker/redder edges
+           gradient.addColorStop(0, 'rgba(255, 255, 255, 0.1)'); // Highlighting center
+           gradient.addColorStop(1, 'rgba(0, 0, 0, 0.1)'); // Darker edges
            ctx.fillStyle = gradient;
            ctx.fillRect(0, 0, size, size);
 
-           // Imperfections: Varied pigmentation (Freckles/Spots)
+           // Imperfections
            const spots = 300; 
            for(let i=0; i < spots; i++) {
                const x = Math.random() * size;
                const y = Math.random() * size;
                const r = Math.random() * 1.5 + 0.2;
-               ctx.fillStyle = `rgba(130, 90, 80, ${Math.random() * 0.15})`; // Subtle brownish red
+               ctx.fillStyle = `rgba(80, 40, 30, ${Math.random() * 0.1})`; 
                ctx.beginPath();
                ctx.arc(x, y, r, 0, Math.PI * 2);
                ctx.fill();
            }
 
-           // Noise for uneven skin tone
+           // Noise
            const noiseData = ctx.getImageData(0,0,size,size);
            for(let i=0; i<noiseData.data.length; i+=4) {
                if(Math.random() > 0.8) {
@@ -120,7 +157,6 @@ const ExerciseAnimation: React.FC<Props> = ({ visualTag, exerciseName, descripti
 
        } else {
            // Bump Map
-           // Middle grey for base bump
            ctx.fillStyle = '#808080';
            ctx.fillRect(0, 0, size, size);
 
@@ -128,23 +164,12 @@ const ExerciseAnimation: React.FC<Props> = ({ visualTag, exerciseName, descripti
            const imgData = ctx.getImageData(0, 0, size, size);
            const data = imgData.data;
            for(let i=0; i < data.length; i += 4) {
-                const noise = (Math.random() - 0.5) * 15; // Intensity of pore bump
+                const noise = (Math.random() - 0.5) * 15; 
                 data[i] = Math.max(0, Math.min(255, data[i] + noise));
                 data[i+1] = Math.max(0, Math.min(255, data[i+1] + noise));
                 data[i+2] = Math.max(0, Math.min(255, data[i+2] + noise));
            }
            ctx.putImageData(imgData, 0, 0);
-
-           // Random indentations (pores/moles)
-           for(let i=0; i<200; i++) {
-               const x = Math.random() * size;
-               const y = Math.random() * size;
-               const r = Math.random() * 1.0;
-               ctx.fillStyle = 'rgba(0,0,0,0.15)';
-               ctx.beginPath();
-               ctx.arc(x,y,r,0,Math.PI*2);
-               ctx.fill();
-           }
        }
     } else {
        // Fabric base
@@ -174,6 +199,13 @@ const ExerciseAnimation: React.FC<Props> = ({ visualTag, exerciseName, descripti
   useEffect(() => {
     if (!mountRef.current) return;
 
+    // Cleanup previous instance
+    if (rendererRef.current) {
+        mountRef.current.removeChild(rendererRef.current.domElement);
+        rendererRef.current.dispose();
+        rendererRef.current = null;
+    }
+
     // Reset State
     setIsLoading(true);
     setHasError(false);
@@ -190,6 +222,9 @@ const ExerciseAnimation: React.FC<Props> = ({ visualTag, exerciseName, descripti
     let controls: any;
 
     try {
+      const profile = BODY_PROFILES[bodyProfileIndex];
+      const skinColor = SKIN_TONES[skinToneIndex];
+
       scene = new THREE.Scene();
       scene.background = new THREE.Color(0x1e293b); 
 
@@ -230,18 +265,18 @@ const ExerciseAnimation: React.FC<Props> = ({ visualTag, exerciseName, descripti
       scene.add(gridHelper);
 
       // Materials
-      const skinColorTex = createTexture('skin', 'color');
+      const skinColorTex = createTexture('skin', 'color', skinColor);
       const skinBumpTex = createTexture('skin', 'bump');
       const fabricTex = createTexture('fabric', 'bump'); 
       
       const mats: MaterialSet = {
         skin: new THREE.MeshPhysicalMaterial({
-            color: 0xffeadd, 
+            color: new THREE.Color(skinColor), 
             map: skinColorTex, 
             bumpMap: skinBumpTex, 
-            bumpScale: 0.008, // Enhanced bump scale for pores
-            roughness: 0.45,  // Slightly more matte
-            clearcoat: 0.3,   // Sweat sheen capability
+            bumpScale: 0.008,
+            roughness: 0.45,  
+            clearcoat: 0.3,   
             clearcoatRoughness: 0.2
         }),
         clothesTop: new THREE.MeshPhysicalMaterial({
@@ -252,14 +287,12 @@ const ExerciseAnimation: React.FC<Props> = ({ visualTag, exerciseName, descripti
         }),
         shoe: new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.5 }),
         joint: new THREE.MeshPhysicalMaterial({ color: 0x64748b, roughness: 0.7 }),
-        // Enhanced Joint Highlight (Bright Orange/Red)
         jointHighlight: new THREE.MeshPhysicalMaterial({
             color: 0xffaa00, 
             emissive: 0xff4400, 
             emissiveIntensity: 2.0, 
             roughness: 0.2
         }),
-        // Enhanced Muscle Highlight (Glows through clothing/skin with High Contrast)
         highlight: new THREE.MeshPhysicalMaterial({
             color: 0xff3366, 
             emissive: 0xff0044, 
@@ -272,7 +305,7 @@ const ExerciseAnimation: React.FC<Props> = ({ visualTag, exerciseName, descripti
       };
       matsRef.current = mats;
 
-      // Construct Mannequin
+      // Construct Mannequin with Body Profile Scalars
       const mannequin = new THREE.Group();
       scene.add(mannequin);
       const parts: Record<string, THREE.Mesh> = {};
@@ -290,23 +323,26 @@ const ExerciseAnimation: React.FC<Props> = ({ visualTag, exerciseName, descripti
       const pelvis = new THREE.Group();
       pelvis.position.y = 1.0;
       mannequin.add(pelvis);
-      createPart('hips', new THREE.CylinderGeometry(0.11, 0.17, 0.22, 32), mats.clothesBot, pelvis);
+      // Hips: Wider for curvy/postpartum
+      createPart('hips', new THREE.CylinderGeometry(0.11 * profile.hipScale, 0.17 * profile.hipScale, 0.22, 32), mats.clothesBot, pelvis);
 
       const spine = new THREE.Group();
       spine.position.y = 0.11;
       pelvis.add(spine);
-      const waist = createPart('abs', new THREE.CapsuleGeometry(0.105, 0.20, 8, 32), mats.clothesTop, spine);
+      // Waist: Width varies
+      const waist = createPart('abs', new THREE.CapsuleGeometry(0.105 * profile.waistScale, 0.20, 8, 32), mats.clothesTop, spine);
       waist.position.y = 0.12;
 
       const chestGroup = new THREE.Group();
       chestGroup.position.y = 0.32;
       spine.add(chestGroup);
-      createPart('chest', new THREE.CylinderGeometry(0.15, 0.11, 0.28, 32), mats.clothesTop, chestGroup);
+      // Chest
+      createPart('chest', new THREE.CylinderGeometry(0.15 * profile.chestScale, 0.11 * profile.waistScale, 0.28, 32), mats.clothesTop, chestGroup);
 
       const neckGroup = new THREE.Group();
       neckGroup.position.y = 0.14;
       chestGroup.add(neckGroup);
-      const neck = createPart('neck', new THREE.CylinderGeometry(0.04, 0.05, 0.1, 24), mats.skin, neckGroup);
+      const neck = createPart('neck', new THREE.CylinderGeometry(0.04 * profile.limbThickness, 0.05 * profile.limbThickness, 0.1, 24), mats.skin, neckGroup);
       neck.position.y = 0.05;
 
       const headGroup = new THREE.Group();
@@ -328,40 +364,45 @@ const ExerciseAnimation: React.FC<Props> = ({ visualTag, exerciseName, descripti
          let lowerName = isLeg ? `${side}Shin` : `${side}Forearm`;
          let upperMesh, lowerMesh;
 
+         // Limb thickness multiplier
+         const lt = profile.limbThickness;
+
          if (isLeg) {
-             root.position.set(sign * 0.15, -0.05, 0);
+             // Legs might start wider apart for wider hips
+             root.position.set(sign * 0.15 * profile.hipScale, -0.05, 0);
              pelvis.add(root);
-             createPart(`${side}HipJoint`, new THREE.SphereGeometry(0.075, 32, 32), mats.joint, root);
+             createPart(`${side}HipJoint`, new THREE.SphereGeometry(0.075 * lt, 32, 32), mats.joint, root);
              
              const thighG = new THREE.Group(); root.add(thighG);
-             upperMesh = createPart(upperName, new THREE.CapsuleGeometry(0.115, 0.38, 8, 32), mats.clothesBot, thighG);
+             upperMesh = createPart(upperName, new THREE.CapsuleGeometry(0.115 * lt, 0.38, 8, 32), mats.clothesBot, thighG);
              upperMesh.position.y = -0.22;
              
              mid.position.y = -0.44; thighG.add(mid);
-             createPart(`${side}Knee`, new THREE.SphereGeometry(0.065, 32, 32), mats.joint, mid);
-             lowerMesh = createPart(lowerName, new THREE.CapsuleGeometry(0.085, 0.38, 8, 32), mats.clothesBot, mid);
+             createPart(`${side}Knee`, new THREE.SphereGeometry(0.065 * lt, 32, 32), mats.joint, mid);
+             lowerMesh = createPart(lowerName, new THREE.CapsuleGeometry(0.085 * lt, 0.38, 8, 32), mats.clothesBot, mid);
              lowerMesh.position.y = -0.22;
              
              end.position.y = -0.44; mid.add(end);
-             createPart(`${side}Ankle`, new THREE.SphereGeometry(0.055, 32, 32), mats.joint, end);
+             createPart(`${side}Ankle`, new THREE.SphereGeometry(0.055 * lt, 32, 32), mats.joint, end);
              const foot = createPart(`${side}Foot`, new THREE.BoxGeometry(0.08, 0.05, 0.22), mats.shoe, end);
              foot.position.set(0, -0.04, 0.06);
          } else {
-             root.position.set(sign * 0.18, 0.10, 0);
+             // Shoulders width multiplier
+             root.position.set(sign * 0.18 * profile.shoulderWidth, 0.10, 0);
              chestGroup.add(root);
-             createPart(`${side}Shoulder`, new THREE.SphereGeometry(0.065, 32, 32), mats.joint, root);
+             createPart(`${side}Shoulder`, new THREE.SphereGeometry(0.065 * lt, 32, 32), mats.joint, root);
              
-             upperMesh = createPart(upperName, new THREE.CapsuleGeometry(0.065, 0.28, 8, 32), mats.clothesTop, root);
+             upperMesh = createPart(upperName, new THREE.CapsuleGeometry(0.065 * lt, 0.28, 8, 32), mats.clothesTop, root);
              upperMesh.position.y = -0.16;
              
              mid.position.y = -0.32; root.add(mid);
-             createPart(`${side}Elbow`, new THREE.SphereGeometry(0.055, 32, 32), mats.joint, mid);
-             lowerMesh = createPart(lowerName, new THREE.CapsuleGeometry(0.055, 0.24, 8, 32), mats.skin, mid);
+             createPart(`${side}Elbow`, new THREE.SphereGeometry(0.055 * lt, 32, 32), mats.joint, mid);
+             lowerMesh = createPart(lowerName, new THREE.CapsuleGeometry(0.055 * lt, 0.24, 8, 32), mats.skin, mid);
              lowerMesh.position.y = -0.15;
              
              end.position.y = -0.28; mid.add(end);
-             createPart(`${side}Wrist`, new THREE.SphereGeometry(0.045, 32, 32), mats.joint, end);
-             const hand = createPart(`${side}Hand`, new THREE.BoxGeometry(0.04, 0.10, 0.08), mats.skin, end);
+             createPart(`${side}Wrist`, new THREE.SphereGeometry(0.045 * lt, 32, 32), mats.joint, end);
+             const hand = createPart(`${side}Hand`, new THREE.BoxGeometry(0.04 * lt, 0.10, 0.08 * lt), mats.skin, end);
              hand.position.y = -0.06;
          }
          return { root, mid, end, upperMeshName: upperName, lowerMeshName: lowerName };
@@ -372,13 +413,12 @@ const ExerciseAnimation: React.FC<Props> = ({ visualTag, exerciseName, descripti
       const lArm = createLimb('left', false);
       const rArm = createLimb('right', false);
 
-      // Rig Object
       rigRef.current = {
          main: mannequin,
          pelvis, spine, chest: chestGroup, neck: neckGroup, head: headGroup,
          legs: { l: lLeg, r: rLeg },
          arms: { l: lArm, r: rArm },
-         parts // Critical: Pass the parts dictionary to the engine
+         parts 
       };
 
       // Guide Lines
@@ -455,11 +495,11 @@ const ExerciseAnimation: React.FC<Props> = ({ visualTag, exerciseName, descripti
       cancelAnimationFrame(animationId);
       resizeObserver?.disconnect();
       if (rendererRef.current) {
-         mountRef.current?.removeChild(rendererRef.current.domElement);
+         if (mountRef.current) mountRef.current.removeChild(rendererRef.current.domElement);
          rendererRef.current.dispose();
       }
     };
-  }, [visualTag, showGuides, exerciseName]);
+  }, [visualTag, showGuides, exerciseName, bodyProfileIndex, skinToneIndex]);
 
   return (
     <div className="relative w-full h-full group bg-slate-900 rounded-lg overflow-hidden">
@@ -480,8 +520,9 @@ const ExerciseAnimation: React.FC<Props> = ({ visualTag, exerciseName, descripti
 
         <div ref={mountRef} className="w-full h-full cursor-move" />
         
-        {/* Camera Views */}
+        {/* Top Right Controls (Views & Body) */}
         <div className="hidden md:flex absolute top-4 right-4 flex-col gap-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            {/* View Controls */}
             <div className="bg-slate-900/60 backdrop-blur-md rounded-lg border border-white/10 p-1">
                 <div className="text-[10px] text-slate-400 font-bold uppercase px-2 py-1 flex items-center gap-1 border-b border-white/5 mb-1"><Eye size={10} /> Views</div>
                 <div className="flex flex-col gap-0.5">
@@ -490,6 +531,30 @@ const ExerciseAnimation: React.FC<Props> = ({ visualTag, exerciseName, descripti
                     ))}
                 </div>
             </div>
+
+            {/* Customization Controls */}
+            <div className="bg-slate-900/60 backdrop-blur-md rounded-lg border border-white/10 p-1">
+                 <div className="text-[10px] text-slate-400 font-bold uppercase px-2 py-1 flex items-center gap-1 border-b border-white/5 mb-1"><User size={10} /> Model</div>
+                 <div className="flex flex-col gap-1">
+                    <button onClick={cycleBodyProfile} className="px-3 py-1.5 text-[10px] font-bold text-slate-300 hover:text-rose-300 hover:bg-white/10 rounded text-left flex items-center gap-2">
+                         <span className="truncate">{BODY_PROFILES[bodyProfileIndex].label}</span>
+                    </button>
+                    <button onClick={cycleSkinTone} className="px-3 py-1.5 text-[10px] font-bold text-slate-300 hover:text-rose-300 hover:bg-white/10 rounded text-left flex items-center gap-2">
+                         <div className="w-3 h-3 rounded-full border border-white/20" style={{backgroundColor: SKIN_TONES[skinToneIndex]}}></div>
+                         Tone
+                    </button>
+                 </div>
+            </div>
+        </div>
+
+        {/* Mobile Customization Toggles (Top Left) */}
+        <div className="md:hidden absolute top-3 left-3 flex gap-2 z-10">
+            <button onClick={cycleBodyProfile} className="p-2 bg-black/30 backdrop-blur-md rounded-full text-white/80 border border-white/10">
+                <User size={16} />
+            </button>
+            <button onClick={cycleSkinTone} className="p-2 bg-black/30 backdrop-blur-md rounded-full text-white/80 border border-white/10">
+                <Palette size={16} />
+            </button>
         </div>
 
         {/* Controls */}

@@ -1,103 +1,159 @@
+
 # Postpartum Recovery AI Assistant 🌸
 
-A privacy-first, AI-powered web application designed to guide women through their postpartum recovery journey. This app combines **Google Gemini's multimodal AI** with **interactive 3D visualizations** to provide medically aware, culturally sensitive, and personalized physical therapy roadmaps.
+![Status](https://img.shields.io/badge/Status-Production%20Ready-green)
+![Tech](https://img.shields.io/badge/AI-Google%20Gemini-blue)
+![Privacy](https://img.shields.io/badge/Privacy-Local%20First-purple)
+
+**A privacy-first, AI-powered companion designed to bridge the gap in postpartum healthcare.** 
+
+This web application combines **Google Gemini's multimodal AI** with **interactive 3D visualizations** to provide medically aware, culturally sensitive, and personalized physical therapy roadmaps for new mothers.
 
 ---
 
-## 🤰 For Mothers (User Guide)
+## 🧩 The Problem
 
-### What is this?
-Postpartum Recovery AI is your digital companion for the "4th Trimester" and beyond. Unlike generic fitness apps, this tool understands that every birth is different. It creates a recovery plan based on your specific delivery method (C-section vs. Vaginal), symptoms (e.g., Diastasis Recti, leaking), and energy levels.
+The "4th Trimester" (the first 12 weeks after birth) is a critical period often neglected in modern healthcare. 
+*   **The Care Gap:** New mothers are typically discharged from the hospital within 2 days but don't see a doctor again until 6 weeks later.
+*   **Information Overload:** Moms often turn to social media for fitness advice, which can lead to unsafe exercises causing injury (e.g., worsening Diastasis Recti).
+*   **Lack of Access:** Pelvic floor physical therapy is expensive and inaccessible to many.
+*   **Generic Advice:** Most fitness apps do not account for delivery methods (C-Section vs. Vaginal) or specific complications.
 
-### Key Features
+## 🌍 Social Impact
 
-1.  **Personalized Roadmap:**
-    *   Input your details (weeks postpartum, pain levels, delivery type).
-    *   Receive a 12-week phased recovery plan (Reconnect → Stability → Strength).
-    *   Includes daily checklists and "Mom-First" wellness tips.
-
-2.  **Diastasis Recti Analyzer (AI Vision):**
-    *   Upload a photo of your abdomen.
-    *   The AI estimates gap severity and tissue integrity to recommend safe movements.
-    *   *Privacy Note:* Photos are processed by AI in memory and **never stored** on any server.
-
-3.  **Form Correction Lab (AI Video Analysis):**
-    *   Unsure if you're doing an exercise correctly?
-    *   Upload a 5-10 second video clip.
-    *   The AI analyzes your posture and movement to provide safety scores and specific corrections.
-
-4.  **Interactive 3D Guides:**
-    *   View exercises via a procedural 3D mannequin.
-    *   **Visual cues:** Muscles glow when active, joints highlight red if they are under stress.
-    *   **Realism:** The model breathes, balances, and reacts to exertion levels.
-
-5.  **"Rose" - Your Health Coach:**
-    *   Chat with an empathetic AI coach specialized in women's health.
-    *   Ask questions via text or voice.
-
-### Privacy & Safety
-*   **Local-First:** Your health data, logs, and plans are stored locally on your device (browser storage). We do not maintain a central database of your medical history.
-*   **Medical Disclaimer:** This app is for informational purposes. Always consult your doctor before starting exercise after birth.
+**PostpartumAI** aims to democratize access to safe recovery guidance:
+1.  **Reducing Long-term Injury:** By providing AI-driven form correction and safety filters, we prevent conditions like uterine prolapse and chronic back pain.
+2.  **Mental Health Support:** The empathetic AI coach ("Rose") provides reassurance during a time of high anxiety and isolation.
+3.  **Cultural Inclusivity:** The app supports 8 languages and includes culturally specific wellness advice (e.g., confinement practices for South Asian/Middle Eastern users), respecting traditions often ignored by Western medicine.
 
 ---
 
-## 💻 For Developers (Technical Documentation)
+## 🚀 Key Features
+
+### 1. Personalized Recovery Roadmap
+Instead of a generic "get fit" plan, the AI generates a 12-week phased journey based on:
+*   Delivery Method (C-Section / Vaginal)
+*   Current Symptoms (Leaking, Pain)
+*   Diastasis Recti Status
+*   Energy Levels
+
+### 2. Diastasis Recti Analyzer (AI Vision)
+*   **How it works:** Users upload a photo of their abdomen. Gemini 3.0 Pro analyzes tissue integrity, doming, and gap width.
+*   **Result:** Provides a severity estimate and automatically adjusts the exercise plan to avoid unsafe movements.
+*   **Privacy:** Images are processed in-memory and **never stored** on any server.
+
+### 3. AI Form Correction Lab (Video Analysis)
+*   **How it works:** Users record a 5-10 second clip of an exercise.
+*   **Result:** The AI acts as a virtual physical therapist, analyzing alignment and providing a safety score (1-10) with specific corrections.
+
+### 4. Interactive 3D Mannequin
+*   **Procedural Animation:** A custom Three.js engine generates a 3D model that breathes and moves.
+*   **Realism:** The model reacts to "exertion"—breathing gets heavier, muscles flush red, and sweat appears based on the intensity of the movement.
+*   **Inclusivity:** Users can toggle body types (Postpartum/Curvy, Athletic, Standard) and skin tones to see themselves represented.
+
+### 5. "Rose" - The AI Health Coach
+*   A context-aware chatbot that knows your specific medical profile.
+*   Supports Voice-to-Text and Text-to-Speech for hands-free interaction while holding a baby.
+
+---
+
+## 🎯 Who Is This App For?
+
+*   **New Mothers (0-12 months postpartum):** Looking for safe, guided recovery.
+*   **C-Section Moms:** Needing specific scar-care and gentle mobility work.
+*   **Moms with Diastasis Recti:** Needing core-safe workouts.
+*   **Non-English Speakers:** The app fully supports Spanish, French, German, Arabic, Hindi, Chinese, and Japanese.
+
+---
+
+## 📖 How To Use
+
+1.  **Assessment:** Complete the 3-step onboarding quiz. Be honest about pain levels and delivery details.
+2.  **Generate Plan:** The AI will craft your 12-week roadmap.
+3.  **Daily Check-in:** Log your exercises. Use the **3D Guide** to see how movements are performed.
+4.  **Check Safety:** 
+    *   Use the **Belly Analyzer** if you suspect ab separation.
+    *   Use the **Video Lab** if you are unsure about your squat or core form.
+5.  **Chat:** Tap the message icon to ask "Rose" questions like *"Is it normal to feel pressure when I sneeze?"*
+
+---
+
+## 🛠️ Technical Architecture
 
 ### Tech Stack
-*   **Frontend:** React 19, TypeScript, Tailwind CSS.
-*   **AI Core:** Google Gemini API (`@google/genai`).
-*   **3D Engine:** Three.js (Procedural generation, no external GLB assets required).
-*   **Icons:** Lucide React.
-*   **Build/Bundling:** Standard ES Modules (No complex build step required for this demo structure).
+*   **Frontend:** React 19, TypeScript, Tailwind CSS, Lucide Icons.
+*   **AI Models:** 
+    *   `gemini-2.5-flash`: For high-speed text generation and logic.
+    *   `gemini-3-pro-preview`: For complex vision (Image/Video) analysis and deep reasoning.
+*   **3D Engine:** Three.js (Custom procedural rig, no external model files).
+*   **Storage:** LocalStorage (Primary) + Supabase (Optional Cloud Sync).
 
-### Architecture Overview
+### Privacy & Security
+*   **Local-First:** All sensitive health data lives in the user's browser.
+*   **Stateless AI:** When analyzing images/video, data is sent to the API and immediately discarded. No training on user data.
+*   **Cloud Sync:** Users must explicitly sign up to sync data; otherwise, the app works 100% offline.
 
-#### 1. AI Integration (`services/geminiService.ts`)
-We utilize a hybrid model approach for cost and latency optimization:
-*   **Gemini 2.5 Flash:** Used for high-speed tasks like generating the JSON Roadmap structure and simple text feedback.
-*   **Gemini 3.0 Pro Preview:** Used for complex multimodal reasoning:
-    *   **Vision:** Analyzing user uploaded images for medical conditions (Diastasis).
-    *   **Video:** Analyzing movement patterns in video clips for form correction.
-    *   **Reasoning:** The Chatbot ("Rose") uses "Thinking Mode" to provide empathetic and medically sound advice.
+---
 
-#### 2. Procedural 3D Engine (`components/ExerciseAnimation.tsx`)
-Instead of loading heavy 3D assets, the mannequin is generated procedurally using Three.js primitives.
-*   **Dynamic Textures:** Skin and fabric textures are generated via HTML5 Canvas API at runtime.
-*   **Physics Simulation:** We simulate breathing, muscle swelling (squash & stretch), micro-tremors, and balance sway based on a sine-wave timeline.
-*   **Visual Feedback:**
-    *   `jointHighlightMat`: Changes color (Orange -> Red) based on joint stress intensity.
-    *   `highlightMat`: Emits a glow on muscle groups currently active in the animation phase.
+## 👨‍💻 Getting Started (For Developers)
 
-#### 3. State Management (`services/storageService.ts`)
-*   Implements a **Local-First** architecture.
-*   User state (`AppState`) is persisted to `localStorage`.
-*   Includes utilities for calculating streaks and logging daily activity.
+To run this project locally:
 
-### Setup & Installation
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/kashifumair/postpartum-ai.git
+    cd postpartum-ai
+    ```
 
-1.  **Environment Variables:**
-    You must have a Google Gemini API Key.
-    The app expects the key to be available via `process.env.API_KEY`.
-
-2.  **Running the App:**
-    This project is structured as a standard React application.
+2.  **Install Dependencies:**
     ```bash
     npm install
+    ```
+
+3.  **Set Environment Variables:**
+    Create a `.env` file in the root directory:
+    ```env
+    API_KEY=your_google_gemini_api_key
+    SUPABASE_URL=your_supabase_url
+    SUPABASE_ANON_KEY=your_supabase_anon_key
+    ```
+
+4.  **Run Development Server:**
+    ```bash
     npm start
     ```
 
-### Key Components
+### Building for Production
+This app is ready for deployment on Vercel, Netlify, or AWS Amplify.
+1.  Run `npm run build`.
+2.  Ensure your environment variables are set in your CI/CD pipeline / Hosting Dashboard.
 
-*   `App.tsx`: Main router and state container. Handles theme switching and layout.
-*   `AssessmentForm.tsx`: Multi-step wizard to collect user physiology data.
-*   `RecoveryPlanView.tsx`: The main dashboard displaying the timeline, daily exercises, and gamification.
-*   `VideoLab.tsx`: Component handling video file uploads and displaying AI analysis results.
-*   `BellyAnalyzer.tsx`: Component handling image uploads for Diastasis analysis.
+---
 
-### Performance Optimizations
-*   **Lazy Loading:** 3D components are initialized only when the modal opens.
-*   **Model Selection:** We default to `gemini-2.5-flash` for critical path rendering to ensure the roadmap generates in < 3 seconds.
-*   **PWA:** `manifest.json` and `sw.js` are included to allow the app to be installed on mobile devices.
+## ⚠️ Known Issues & Limitations
 
-### License
-MIT License.
+*   **Video Analysis Latency:** Uploading large video files on slow connections may take time. The AI processing itself is fast (~3-5s).
+*   **Browser Support:** The Web Speech API (Voice interaction) works best in Chrome and Safari.
+*   **Medical Limit:** The AI is strictly an informational tool. It detects high-risk keywords (e.g., "heavy bleeding") and directs users to seek emergency care, but it cannot diagnose medical emergencies.
+
+---
+
+## 👤 Author
+
+**Kashif**  
+*Full Stack Developer & AI Enthusiast*
+
+I built this application to explore how Multimodal AI can solve real-world healthcare accessibility problems.
+
+*   **GitHub:** [github.com/kashifumair](https://github.com/kashifumair)
+*   **Linkedin:** [linkedin.com/in/umair-kashif](https://www.linkedin.com/in/umair-kashif/) (Placeholder)
+
+### 💌 Support & Feedback
+
+If you have suggestions, feature requests, or want to report a bug, please reach out:
+
+*   **Email:** [kashifumair125@gmail.com](mailto:kashifumair125@gmail.com)
+*   **In-App:** Use the "Feedback" button in the footer to send an email directly.
+
+---
+*© 2024 PostpartumAI. All rights reserved.*

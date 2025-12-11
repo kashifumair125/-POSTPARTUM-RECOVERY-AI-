@@ -1,7 +1,8 @@
+
 import React, { useState } from 'react';
 import { analyzeExerciseVideo } from '../services/geminiService';
 import { VideoAnalysis } from '../types';
-import { Video, Upload, AlertTriangle, Loader2, Play } from 'lucide-react';
+import { Video, Upload, AlertTriangle, Loader2, Play, ThumbsUp, ThumbsDown } from 'lucide-react';
 
 interface Props {
   exerciseName?: string;
@@ -13,6 +14,7 @@ const VideoLab: React.FC<Props> = ({ exerciseName = "Heel Slides" }) => {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [customExercise, setCustomExercise] = useState(exerciseName);
+  const [feedback, setFeedback] = useState<'up' | 'down' | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -20,12 +22,14 @@ const VideoLab: React.FC<Props> = ({ exerciseName = "Heel Slides" }) => {
       setFile(selected);
       setPreviewUrl(URL.createObjectURL(selected));
       setResult(null); // Reset previous result
+      setFeedback(null);
     }
   };
 
   const handleAnalyze = async () => {
     if (!file) return;
     setAnalyzing(true);
+    setFeedback(null);
     try {
       const data = await analyzeExerciseVideo(file, customExercise);
       setResult(data);
@@ -34,6 +38,13 @@ const VideoLab: React.FC<Props> = ({ exerciseName = "Heel Slides" }) => {
     } finally {
       setAnalyzing(false);
     }
+  };
+
+  const resetAnalysis = () => {
+    setFile(null); 
+    setPreviewUrl(null); 
+    setResult(null); 
+    setFeedback(null);
   };
 
   return (
@@ -118,8 +129,21 @@ const VideoLab: React.FC<Props> = ({ exerciseName = "Heel Slides" }) => {
               </div>
             </div>
 
+            {/* Feedback Mechanism */}
+            <div className="pt-3 border-t border-stone-100 dark:border-stone-800 flex items-center justify-between">
+               <span className="text-xs text-stone-500 dark:text-stone-400 font-medium">Was this helpful?</span>
+               <div className="flex gap-2">
+                  <button onClick={() => setFeedback('up')} className={`p-1.5 rounded-full transition-colors ${feedback === 'up' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-400'}`}>
+                    <ThumbsUp size={16} />
+                  </button>
+                  <button onClick={() => setFeedback('down')} className={`p-1.5 rounded-full transition-colors ${feedback === 'down' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-400'}`}>
+                    <ThumbsDown size={16} />
+                  </button>
+               </div>
+            </div>
+
             <button 
-              onClick={() => { setFile(null); setPreviewUrl(null); setResult(null); }}
+              onClick={resetAnalysis}
               className="w-full border border-stone-300 dark:border-stone-700 text-stone-600 dark:text-stone-300 font-medium py-2 rounded-lg hover:bg-stone-50 dark:hover:bg-stone-800 text-sm transition-colors"
             >
               Analyze Another Video
