@@ -1,3 +1,4 @@
+
 import { AppState, ChatMessage } from "../types";
 
 const STORAGE_KEY = 'postpartum_ai_v1';
@@ -19,8 +20,21 @@ export const saveState = (state: Partial<AppState>) => {
     const current = loadState();
     const newState = { ...current, ...state };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
-  } catch (e) {
-    console.error("Failed to save state", e);
+  } catch (e: any) {
+    // Handle QuotaExceededError
+    if (e.name === 'QuotaExceededError' || e.code === 22) {
+      console.error("LocalStorage full. Trimming chat history.");
+      // Emergency trim
+      const current = loadState();
+      current.chatHistory = current.chatHistory.slice(-10); // Keep only last 10
+      try {
+         localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
+      } catch (innerE) {
+         console.error("Critical: Cannot save state even after trimming.", innerE);
+      }
+    } else {
+      console.error("Failed to save state", e);
+    }
   }
 };
 

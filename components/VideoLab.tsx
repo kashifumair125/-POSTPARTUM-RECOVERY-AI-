@@ -8,6 +8,8 @@ interface Props {
   exerciseName?: string;
 }
 
+const MAX_VIDEO_SIZE_MB = 20;
+
 const VideoLab: React.FC<Props> = ({ exerciseName = "Heel Slides" }) => {
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState<VideoAnalysis | null>(null);
@@ -15,13 +17,22 @@ const VideoLab: React.FC<Props> = ({ exerciseName = "Heel Slides" }) => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [customExercise, setCustomExercise] = useState(exerciseName);
   const [feedback, setFeedback] = useState<'up' | 'down' | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setError(null);
     if (e.target.files && e.target.files[0]) {
       const selected = e.target.files[0];
+      
+      // Validation
+      if (selected.size > MAX_VIDEO_SIZE_MB * 1024 * 1024) {
+        setError(`Video is too large. Please upload a file smaller than ${MAX_VIDEO_SIZE_MB}MB.`);
+        return;
+      }
+      
       setFile(selected);
       setPreviewUrl(URL.createObjectURL(selected));
-      setResult(null); // Reset previous result
+      setResult(null); 
       setFeedback(null);
     }
   };
@@ -30,11 +41,13 @@ const VideoLab: React.FC<Props> = ({ exerciseName = "Heel Slides" }) => {
     if (!file) return;
     setAnalyzing(true);
     setFeedback(null);
+    setError(null);
     try {
       const data = await analyzeExerciseVideo(file, customExercise);
       setResult(data);
-    } catch (error) {
-      alert("Analysis failed. Please try a shorter video.");
+    } catch (error: any) {
+      console.error(error);
+      setError(error.message || "Analysis failed. Please try a shorter video.");
     } finally {
       setAnalyzing(false);
     }
@@ -45,6 +58,7 @@ const VideoLab: React.FC<Props> = ({ exerciseName = "Heel Slides" }) => {
     setPreviewUrl(null); 
     setResult(null); 
     setFeedback(null);
+    setError(null);
   };
 
   return (
@@ -69,6 +83,13 @@ const VideoLab: React.FC<Props> = ({ exerciseName = "Heel Slides" }) => {
           />
         </div>
 
+        {error && (
+            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded-lg flex items-start gap-2 text-sm">
+              <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+              {error}
+            </div>
+        )}
+
         {!previewUrl ? (
           <label className="block border-2 border-dashed border-stone-300 dark:border-stone-700 rounded-xl p-8 text-center cursor-pointer hover:bg-stone-50 dark:hover:bg-stone-800 transition-colors group">
             <input type="file" accept="video/*" onChange={handleFileChange} className="hidden" />
@@ -76,7 +97,7 @@ const VideoLab: React.FC<Props> = ({ exerciseName = "Heel Slides" }) => {
                  <Upload className="text-stone-400 group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors" size={24} />
             </div>
             <span className="text-rose-700 dark:text-rose-400 font-semibold block text-sm">Upload Video Clip</span>
-            <span className="text-xs text-stone-400">Max 20MB • MP4, MOV</span>
+            <span className="text-xs text-stone-400">Max {MAX_VIDEO_SIZE_MB}MB • MP4, MOV</span>
           </label>
         ) : (
           <div className="mb-4">

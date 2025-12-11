@@ -8,6 +8,28 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 const FAST_MODEL = 'gemini-2.5-flash';
 const SMART_MODEL = 'gemini-3-pro-preview';
 
+/**
+ * HELPER: Cleans AI output to ensure valid JSON.
+ * Google Gemini often returns Markdown code blocks (```json ... ```) which fails JSON.parse.
+ */
+const cleanAndParseJSON = (text: string | undefined) => {
+  if (!text) throw new Error("AI returned empty response.");
+  
+  let cleanText = text.trim();
+  
+  // Remove markdown formatting if present
+  if (cleanText.startsWith('```')) {
+    cleanText = cleanText.replace(/^```(json)?\n/, '').replace(/\n```$/, '');
+  }
+  
+  try {
+    return JSON.parse(cleanText);
+  } catch (e) {
+    console.error("JSON Parse Error. Raw Text:", text);
+    throw new Error("Failed to parse AI response. Please try again.");
+  }
+};
+
 // --- 1. Analyze Diastasis Recti (Image) ---
 export const analyzeDiastasisImage = async (
   file: File, 
@@ -48,13 +70,18 @@ export const analyzeDiastasisImage = async (
     required: ["severity", "gapEstimation", "recommendation", "safeToExercise"]
   };
 
-  const response = await ai.models.generateContent({
-    model: SMART_MODEL, // Use Pro for image analysis accuracy
-    contents: { parts: [base64Data, { text: prompt }] },
-    config: { responseMimeType: "application/json", responseSchema: schema }
-  });
-  
-  return JSON.parse(response.text!);
+  try {
+    const response = await ai.models.generateContent({
+      model: SMART_MODEL, 
+      contents: { parts: [base64Data, { text: prompt }] },
+      config: { responseMimeType: "application/json", responseSchema: schema }
+    });
+    
+    return cleanAndParseJSON(response.text);
+  } catch (error: any) {
+    console.error("Diastasis Analysis Error:", error);
+    throw new Error("Unable to analyze image. Please ensure the image is clear and try again.");
+  }
 };
 
 // --- 2. Generate Recovery Roadmap (Optimized for Variety) ---
@@ -151,7 +178,6 @@ export const generateRecoveryRoadmap = async (profile: any, language: string = '
   };
 
   try {
-    // Using FLASH for speed, but prompt is heavily engineered for variety.
     const response = await ai.models.generateContent({
       model: FAST_MODEL, 
       contents: { parts: [{ text: prompt }] },
@@ -160,10 +186,10 @@ export const generateRecoveryRoadmap = async (profile: any, language: string = '
         responseSchema: schema,
       }
     });
-    return JSON.parse(response.text!) as RecoveryPlan;
+    return cleanAndParseJSON(response.text) as RecoveryPlan;
   } catch (error) {
     console.error("Plan Gen Error:", error);
-    throw new Error("Failed to generate plan.");
+    throw new Error("Failed to generate plan. Please try again.");
   }
 };
 
@@ -182,13 +208,18 @@ export const analyzeExerciseVideo = async (file: File, exerciseName: string, lan
     required: ["feedback", "corrections", "safetyScore"]
   };
 
-  const response = await ai.models.generateContent({
-    model: SMART_MODEL, // Keep Pro for video analysis as it requires high visual reasoning
-    contents: { parts: [base64Data, { text: prompt }] },
-    config: { responseMimeType: "application/json", responseSchema: schema }
-  });
+  try {
+    const response = await ai.models.generateContent({
+      model: SMART_MODEL, 
+      contents: { parts: [base64Data, { text: prompt }] },
+      config: { responseMimeType: "application/json", responseSchema: schema }
+    });
 
-  return JSON.parse(response.text!) as VideoAnalysis;
+    return cleanAndParseJSON(response.text) as VideoAnalysis;
+  } catch (error) {
+     console.error("Video Analysis Error:", error);
+     throw new Error("Video analysis failed. Please try a shorter clip or different angle.");
+  }
 };
 
 // --- 4. Analyze Text Feedback ---
@@ -200,11 +231,15 @@ export const analyzeExerciseFeedback = async (exerciseName: string, userFeedback
     Keep it short (2-3 sentences), warm and encouraging.
     Respond in ${language}.
   `;
-  const response = await ai.models.generateContent({
-    model: FAST_MODEL, // Text feedback is quick
-    contents: { parts: [{ text: prompt }] },
-  });
-  return response.text || "Keep listening to your body.";
+  try {
+    const response = await ai.models.generateContent({
+      model: FAST_MODEL,
+      contents: { parts: [{ text: prompt }] },
+    });
+    return response.text || "Keep listening to your body.";
+  } catch (e) {
+    return "I'm having trouble connecting right now, but please listen to your body and rest if needed.";
+  }
 };
 
 // --- 5. Health Coach Chat (With Thinking Mode) ---
@@ -235,7 +270,6 @@ export const chatWithHealthCoach = async (
     context += " The user has not completed their profile yet, so give general, conservative advice.";
   }
 
-  // Format history for the model (simplified)
   const conversation = history.slice(-6).map(m => `${m.role === 'user' ? 'User' : 'Rose'}: ${m.text}`).join('\n');
   
   const prompt = `
@@ -247,16 +281,20 @@ export const chatWithHealthCoach = async (
     Rose (in ${language}):
   `;
 
-  // Keep Pro with Thinking for Chat to ensure high quality medical/emotional advice
-  const response = await ai.models.generateContent({
-    model: SMART_MODEL,
-    contents: { parts: [{ text: prompt }] },
-    config: {
-      thinkingConfig: { thinkingBudget: 4096 } // Reduced budget slightly for better latency while keeping reasoning
-    }
-  });
+  try {
+    const response = await ai.models.generateContent({
+      model: SMART_MODEL,
+      contents: { parts: [{ text: prompt }] },
+      config: {
+        thinkingConfig: { thinkingBudget: 4096 }
+      }
+    });
 
-  return response.text || "I'm here to listen. Could you tell me more about how you're feeling?";
+    return response.text || "I'm here to listen. Could you tell me more about how you're feeling?";
+  } catch (error) {
+    console.error("Chat Error:", error);
+    return "I'm having a little trouble thinking right now. Could you ask that again?";
+  }
 };
 
 // Helper
@@ -271,4 +309,3 @@ const fileToGenerativePart = async (file: File): Promise<{ inlineData: { data: s
     reader.readAsDataURL(file);
   });
 };
-    

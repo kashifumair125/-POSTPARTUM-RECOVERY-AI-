@@ -10,6 +10,8 @@ interface Props {
   onSkip: () => void;
 }
 
+const MAX_IMAGE_SIZE_MB = 5;
+
 const BellyAnalyzer: React.FC<Props> = ({ weeksPostpartum, onAnalysisComplete, onSkip }) => {
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,6 +28,13 @@ const BellyAnalyzer: React.FC<Props> = ({ weeksPostpartum, onAnalysisComplete, o
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
+      
+      // Validation
+      if (file.size > MAX_IMAGE_SIZE_MB * 1024 * 1024) {
+        setError(`Image is too large. Please upload a file smaller than ${MAX_IMAGE_SIZE_MB}MB.`);
+        return;
+      }
+
       setPreview(URL.createObjectURL(file));
       setError(null);
       setAnalyzing(true);
@@ -183,7 +192,7 @@ const BellyAnalyzer: React.FC<Props> = ({ weeksPostpartum, onAnalysisComplete, o
                     <Camera className="text-rose-600 dark:text-rose-400" size={32} />
                 </div>
                 <span className="text-rose-700 dark:text-rose-300 font-semibold">Tap to Upload Photo</span>
-                <span className="text-xs text-stone-400 mt-2">JPG, PNG (Max 5MB)</span>
+                <span className="text-xs text-stone-400 mt-2">JPG, PNG (Max {MAX_IMAGE_SIZE_MB}MB)</span>
               </div>
             )}
           </>
